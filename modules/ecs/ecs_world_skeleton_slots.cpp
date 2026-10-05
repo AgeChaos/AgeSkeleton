@@ -37,7 +37,13 @@ bool ECSWorld::prepare_skeleton_slots(Dictionary &definition, HashMap<uint64_t,D
 	for(int i=0;i<slot_list.size();i++) {
 		if(slot_list[i].get_type()!=Variant::DICTIONARY) { return false; }
 		Dictionary slot=slot_list[i];
-		for(const Variant &key:slot.keys()) { if(!PackedStringArray({"name","attachment","color","dark","z_index","blend"}).has(String(key))) { return false; } }
+		for(const Variant &key:slot.keys()) { if(!PackedStringArray({"name","attachment","color","dark","z_index","blend","bone"}).has(String(key))) { return false; } }
+		// Slot ownership is an index in this skeleton's bone list, like mesh weights.
+		// Weighted attachments retain their own vertex influences and transforms.
+		if(slot.has("bone")) {
+			Variant bone=slot["bone"];
+			if(bone.get_type()!=Variant::INT || int64_t(bone)<0 || int64_t(bone)>=PackedInt64Array(definition.get("bones",PackedInt64Array())).size()) { return false; }
+		}
 		Variant name=slot.get("name",Variant()),attachment=slot.get("attachment",String()),color=slot.get("color",Color(1,1,1)),z=slot.get("z_index",i),blend=slot.get("blend",0);
 		if(name.get_type()!=Variant::STRING || String(name).is_empty() || slots_by_name.has(name) || attachment.get_type()!=Variant::STRING || color.get_type()!=Variant::COLOR || z.get_type()!=Variant::INT || int64_t(z)<-4096 || int64_t(z)>4096 || blend.get_type()!=Variant::INT || int64_t(blend)<0 || int64_t(blend)>2) { return false; }
 		Color tint=color; for(int c=0;c<4;c++) { if(!Math::is_finite(tint[c])) { return false; } }

@@ -17,6 +17,8 @@ class SkeletonWorkspaceDocking : public Node {
 	HashMap<String, int> default_slots;
 	int base_tabs=0, base_splits=0;
 	bool initialized=false, saving=false;
+	bool side_by_side_base=true;
+	void configure_base_layout(bool p_side_by_side);
 	double save_elapsed=0;
 	void update_workspace();
 	void save_layout();

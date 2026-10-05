@@ -30,7 +30,23 @@ void SkeletonWorkspaceDocking::setup(Control *p_owner, MenuButton *p_menu, const
 		register_tabs(tabs);
 	}
 	for(auto *split:workspace_splits) { split->connect("dragged",callable_mp(this,&SkeletonWorkspaceDocking::save_layout).unbind(1)); }
+	configure_base_layout(true);
 	set_process(true); callable_mp(this,&SkeletonWorkspaceDocking::load_layout).call_deferred();
+}
+
+void SkeletonWorkspaceDocking::configure_base_layout(bool p_side_by_side) {
+	side_by_side_base=p_side_by_side;
+	// Keep the original base profile available when replaying older saved layouts:
+	// their split offsets and docking operations were recorded against that profile.
+	SplitContainer *left=workspace_splits[1],*sheet=workspace_splits[2],*sidebar=workspace_splits[3];
+	sidebar->set_vertical(p_side_by_side?false:true);
+	left->set_stretch_ratio(p_side_by_side?3.0:1.0);
+	sidebar->set_h_size_flags(p_side_by_side?Control::SIZE_EXPAND_FILL:Control::SIZE_FILL);
+	sidebar->set_stretch_ratio(p_side_by_side?2.0:1.0);
+	workspace_tabs[0]->set_stretch_ratio(p_side_by_side?.43:3.0);
+	sheet->set_stretch_ratio(p_side_by_side?.57:1.3);
+	workspace_tabs[3]->set_stretch_ratio(1.05);
+	workspace_tabs[4]->set_stretch_ratio(1.0);
 }
 
 void SkeletonWorkspaceDocking::register_tabs(TabContainer *p_tabs) {
@@ -480,7 +496,7 @@ void SkeletonWorkspaceDocking::save_layout() {
 	Array offsets,selected;
 	for(auto *split:workspace_splits) { offsets.push_back(split->get_split_offset()); }
 	for(auto *tabs:workspace_tabs) { selected.push_back(tabs->get_current_tab()); }
-	state["offsets"]=offsets; state["selected"]=selected;
+	state["offsets"]=offsets; state["selected"]=selected; state["side_by_side_base"]=side_by_side_base;
 	if(has_meta("saved_layout") && Dictionary(get_meta("saved_layout"))==state) { return; }
 	Ref<ConfigFile> config; config.instantiate(); config->set_value("workspace","layout",state);
 	if(config->save(ProjectSettings::get_singleton()->get_project_data_path().path_join("age_skeleton_layout.cfg"))==OK) { set_meta("saved_layout",state); }
@@ -489,6 +505,7 @@ void SkeletonWorkspaceDocking::load_layout() {
 	Ref<ConfigFile> config; config.instantiate();
 	if(config->load(ProjectSettings::get_singleton()->get_project_data_path().path_join("age_skeleton_layout.cfg"))==OK) {
 		Dictionary state=config->get_value("workspace","layout",Dictionary());
+		configure_base_layout(state.get("side_by_side_base",false));
 		restore(state.get("operations",Array()),state.get("windows",Array()));
 		restore_closed_panels(state.get("closed",PackedStringArray()));
 		Array offsets=state.get("offsets",Array()),selected=state.get("selected",Array());
@@ -499,6 +516,7 @@ void SkeletonWorkspaceDocking::load_layout() {
 }
 void SkeletonWorkspaceDocking::reset_layout() {
 	initialized=false; reset_extensions();
+	configure_base_layout(true);
 	for(auto *split:workspace_splits) { split->set_split_offset(0); }
 	initialized=true; update_workspace(); save_layout();
 }

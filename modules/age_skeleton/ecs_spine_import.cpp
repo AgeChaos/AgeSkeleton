@@ -135,7 +135,7 @@ Ref<ECSScene> ecs_import_spine_json(const String &path,String &report) {
 		Dictionary slot=slots[si]; String name=slot.get("name",String()),bone_name=slot.get("bone",String()),blend=slot.get("blend","normal");
 		if(name.is_empty() || slot_names.has(name) || !names.has(bone_name)) { return fail("Invalid slot name or bone"); } slot_names.insert(name);
 		if(blend!="normal" && blend!="additive" && blend!="multiply") { return fail(String(U"尚不支持插槽混合：")+blend); }
-		Dictionary definition; definition["name"]=name; definition["attachment"]=slot.get("attachment",String()); definition["color"]=Color::html(slot.get("color","ffffffff")); definition["dark"]=Color::html(slot.get("dark","000000")); definition["z_index"]=si; definition["blend"]=blend=="additive"?1:blend=="multiply"?2:0; slot_definitions.push_back(definition);
+		Dictionary definition; definition["name"]=name; definition["bone"]=bone_ids.find(int64_t(names[bone_name])); definition["attachment"]=slot.get("attachment",String()); definition["color"]=Color::html(slot.get("color","ffffffff")); definition["dark"]=Color::html(slot.get("dark","000000")); definition["z_index"]=si; definition["blend"]=blend=="additive"?1:blend=="multiply"?2:0; slot_definitions.push_back(definition);
 	}
 	for(const Variant &skin_name:all_skins.keys()) {
 		if(all_skins[skin_name].get_type()!=Variant::DICTIONARY) { return fail("Invalid skin attachment table"); }

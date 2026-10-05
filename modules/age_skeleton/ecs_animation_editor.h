@@ -167,6 +167,7 @@ class ECSAnimationEditor : public VBoxContainer {
 	void hierarchy_quick_filter(bool p_enabled,int p_kind);
 	void hierarchy_tool_action(int p_action);
 	bool run_workspace_tools_self_test();
+	bool run_slot_hierarchy_self_test();
 	void open_find_replace();
 	void refresh_find_replace();
 	void apply_find_replace();

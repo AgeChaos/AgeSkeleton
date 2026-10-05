@@ -56,6 +56,26 @@ class ECSAnimationTimeline : public Control {
     HashSet<String> folded;
     SkeletonTimelineLayout layout;
     HashMap<String, Ref<Texture2D>> icons;
+    Ref<Texture2D> key_glyph, overview_key_glyph;
+    float key_glyph_scale=0;
+    void draw_key_glyph(const Vector2 &center, const Color &color, bool overview=false) {
+        if(key_glyph_scale!=EDSCALE) {
+            // Rasterize once at the actual display density, with transparent padding
+            // for antialiased edges. Do not magnify a low-resolution polygon mask.
+            Ref<Image> image; image.instantiate();
+            image->load_svg_from_string("<svg xmlns='http://www.w3.org/2000/svg' width='12' height='16'><path d='M6 1L11 8L6 15L1 8Z' fill='white'/></svg>",EDSCALE);
+            key_glyph=ImageTexture::create_from_image(image);
+            image.instantiate();
+            image->load_svg_from_string("<svg xmlns='http://www.w3.org/2000/svg' width='9' height='10'><path d='M4.5 1L8 5L4.5 9L1 5Z' fill='white'/></svg>",EDSCALE);
+            overview_key_glyph=ImageTexture::create_from_image(image);
+            key_glyph_scale=EDSCALE;
+        }
+        Ref<Texture2D> glyph=overview?overview_key_glyph:key_glyph;
+        Vector2 size=glyph->get_size()/EDSCALE;
+        // Align the texture to physical pixels even at fractional UI scales or times.
+        Vector2 origin=((center-size*.5)*EDSCALE).round()/EDSCALE;
+        draw_texture_rect(glyph,Rect2(origin,size),false,color);
+    }
     int visible_rows() const { return MAX(1, int((logical_size().y-62-time_bar_height()/EDSCALE)/26)); }
     void rebuild_rows() {
         Array entities=editor->scene.is_valid()?editor->scene->get_entities():Array();
@@ -94,7 +114,7 @@ class ECSAnimationTimeline : public Control {
             if(pixels.has(pixel) && !selected) { continue; }
             pixels.insert(pixel);
             Color color=selected?Color(1,1,1):summary?Color(.87,.90,.92):channel_color(clip->track_get_path(track).get_concatenated_subnames());
-            draw_colored_polygon(PackedVector2Array({Vector2(x,y+6),Vector2(x+5,y+13),Vector2(x,y+20),Vector2(x-5,y+13)}),color);
+            draw_key_glyph(Vector2(x,y+13),color);
         }
     }
 	Vector2 logical_size() const { return get_size()/EDSCALE; }
@@ -129,7 +149,7 @@ protected:
                     double at=clip->track_get_key_time(t,k); float x=280+(at-offset)*zoom;
                     if(x<280) { continue; } if(x>logical_size().x) { break; }
                     int bucket=int(Math::round(x/7.0)); if(diamond_pixels.has(bucket)) { continue; } diamond_pixels.insert(bucket);
-                    draw_colored_polygon(PackedVector2Array({Vector2(x,26),Vector2(x+3.5,30),Vector2(x,34),Vector2(x-3.5,30)}),Color(.94,.65,.3));
+                    draw_key_glyph(Vector2(x,30),Color(.94,.65,.3),true);
                 }
             }
         }
@@ -156,13 +176,17 @@ protected:
                 draw_texture_rect(icons[icon_key],Rect2(26,y+5,16,16),false);
                 draw_string(font,Vector2(48,y+18),SkeletonTimelineLayout::channel_label(clip->track_get_path(row.track).get_concatenated_subnames()),HORIZONTAL_ALIGNMENT_LEFT,224,fs,text);
             }
-            HashSet<int> pixels;
-            if(summary) { for(int track:group.tracks) { draw_keys(clip,track,y,true,pixels); } }
-            else { draw_keys(clip,row.track,y,false,pixels); }
         }
-        // Draw frame guides over the row fills so they remain visible throughout the sheet.
+        // Draw each guide once, above row fills but below key glyphs.
         for(double t=Math::ceil(offset/step)*step;t<offset+MAX(0.0,double(logical_size().x-280))/zoom;t+=step) {
             float x=280+(t-offset)*zoom; draw_line(Vector2(x,62),Vector2(x,logical_size().y),Color(.5,.5,.5,.22));
+        }
+        for(int r=row_offset;r<layout.rows.size();++r) {
+            float y=62+(r-row_offset)*26; if(y>=logical_size().y) { break; }
+            const SkeletonTimelineRow &row=layout.rows[r];
+            HashSet<int> pixels;
+            if(row.track<0) { for(int track:layout.groups[row.group].tracks) { draw_keys(clip,track,y,true,pixels); } }
+            else { draw_keys(clip,row.track,y,false,pixels); }
         }
 		float cursor=280+(editor->time->get_value()-offset)*zoom;
 		if(cursor>=280 && cursor<logical_size().x) { draw_line(Vector2(cursor,26),Vector2(cursor,logical_size().y),accent,1); draw_colored_polygon(PackedVector2Array({Vector2(cursor-5,20),Vector2(cursor+5,20),Vector2(cursor,27)}),accent); }
@@ -372,7 +396,11 @@ ECSAnimationEditor::ECSAnimationEditor() {
 	canvas_tool_host=memnew(VBoxContainer); canvas_tool_host->set_name("CanvasTools"); tool_frame->add_child(canvas_tool_host);
 	local_canvas=memnew(ECSUICanvasEditor); local_canvas->set_custom_minimum_size(Size2(350,220)); local_canvas->set_h_size_flags(SIZE_EXPAND_FILL); local_canvas->set_skeleton_authoring(true); local_canvas->set_tooltip_text(String(U"选择骨骼或图片并拖动；中键平移，滚轮缩放，Home 适应视图，Esc 取消当前拖动。")); upper->add_child(local_canvas);
 	mode_button->set_name("AuthoringMode"); mode_button->set_toggle_mode(true);
-	mode_button->set_custom_minimum_size(Size2(104,30)*EDSCALE);
+	mode_button->set_custom_minimum_size(Size2(0,30)*EDSCALE);
+	mode_button->set_text_alignment(HORIZONTAL_ALIGNMENT_LEFT);
+	mode_button->set_icon_alignment(HORIZONTAL_ALIGNMENT_LEFT);
+	mode_button->add_theme_constant_override("h_separation",6*EDSCALE);
+	mode_button->add_theme_font_size_override("font_size",14*EDSCALE);
 	mode_button->set_expand_icon(true); mode_button->add_theme_constant_override("icon_max_width",18*EDSCALE);
 	local_canvas->connect("bone_create_requested",callable_mp(this,&ECSAnimationEditor::create_bone_from_drag));
 	local_canvas->connect("images_dropped",callable_mp(this,&ECSAnimationEditor::images_dropped));
@@ -443,7 +471,7 @@ ECSAnimationEditor::ECSAnimationEditor() {
 	auto *timeline_zoom=memnew(HSlider); timeline_zoom->set_min(30); timeline_zoom->set_max(3200); timeline_zoom->set_value(1200); timeline_zoom->set_custom_minimum_size(Size2(180,16)*EDSCALE); timeline_zoom->set_h_size_flags(SIZE_SHRINK_BEGIN); timeline_zoom->set_tooltip_text(String(U"时间轴缩放（Ctrl + 滚轮）；Shift + 滚轮水平滚动")); timeline_zoom->connect("value_changed",callable_mp(timeline,&ECSAnimationTimeline::set_zoom)); bottom->add_child(timeline_zoom);
 
 	// Keep the hierarchy stationary while the contextual properties scroll independently.
-	auto *sidebar=memnew(VSplitContainer); sidebar->set_custom_minimum_size(Size2(360,0)*EDSCALE); sidebar->set_h_size_flags(SIZE_FILL); outer->add_child(sidebar);
+	auto *sidebar=memnew(SplitContainer); sidebar->set_custom_minimum_size(Size2(360,0)*EDSCALE); sidebar->set_h_size_flags(SIZE_FILL); outer->add_child(sidebar);
 	auto *tree_frame=framed(sidebar); tree_frame->set_stretch_ratio(1.05);
 	auto *right=memnew(VBoxContainer); tree_frame->add_child(right);
 	title=build_panel_header(right,String(U"层级树"),"skeleton",false);
@@ -948,6 +976,6 @@ bool ECSAnimationEditor::run_self_test() {
 	ok &= verify(undo->undo() && scene->get_entities().size()==image_count, __LINE__); edit_scene(scene,nullptr); set_mode(1);
 	bool saved_independent=original_independent; pending_project_operation=-1; project_action(0); ok &= verify(independent_project && scene->get_entities().size()==2 && Vector3(Dictionary(scene->get_entities()[0])["position"])==Vector3(), __LINE__); project_action(5); ok &= verify(scene->get_entities().size()==3, __LINE__);
 	if(scene->is_connected("changed",callable_mp(this,&ECSAnimationEditor::project_changed))) { scene->disconnect("changed",callable_mp(this,&ECSAnimationEditor::project_changed)); } independent_project=false;
-	ok &= verify(run_workspace_tools_self_test(), __LINE__); ok &= verify(workspace_docking->run_self_test(), __LINE__); edit_scene(original,view); independent_project=saved_independent; if(saved_independent) { scene->connect("changed",callable_mp(this,&ECSAnimationEditor::project_changed)); } if(ok) { print_line("ECS_ANIMATION_AUTHOR_PASS mesh_subdivision binding_selection mesh_drag_undo_cancel mesh_save_reload curve weight_stroke_undo_cancel weight_normalization spine_json atlas weighted_mesh import_roundtrip new_project add_bone mode_switch pose_keys_without_rest_mutation key_insert key_move undo_redo save_reload named_clip rename auto_weights valid_scene"); } return ok;
+	ok &= verify(run_workspace_tools_self_test(), __LINE__); ok &= verify(run_slot_hierarchy_self_test(), __LINE__); ok &= verify(workspace_docking->run_self_test(), __LINE__); edit_scene(original,view); independent_project=saved_independent; if(saved_independent) { scene->connect("changed",callable_mp(this,&ECSAnimationEditor::project_changed)); } if(ok) { print_line("ECS_ANIMATION_AUTHOR_PASS mesh_subdivision binding_selection mesh_drag_undo_cancel mesh_save_reload curve weight_stroke_undo_cancel weight_normalization spine_json atlas weighted_mesh import_roundtrip new_project add_bone mode_switch pose_keys_without_rest_mutation key_insert key_move undo_redo save_reload named_clip rename auto_weights valid_scene"); } return ok;
 }
 #endif

@@ -137,7 +137,7 @@ def generate(output):
                          "triangles": packed("PackedInt32Array", triangles), "texture": Raw(f'ExtResource("{ext[asset]}")'),
                          "skeleton": 0, "bones": packed("PackedInt32Array", indices), "weights": packed("PackedFloat32Array", weights),
                          "color": Raw(f"Color({tint}, {tint}, {tint}, 1)"), "z_index": z}})
-        slots.append({"name": name, "attachment": name, "z_index": z})
+        slots.append({"name": name, "bone": bone-1, "attachment": name, "z_index": z})
         skin[name] = {name: index}
 
     clips = []

@@ -6,6 +6,46 @@
 #include "scene/gui/item_list.h"
 #include "scene/gui/color_picker.h"
 
+namespace {
+int slot_bone_entity(const Array &entities, int rig, const Dictionary &slot, const Vector<int> &attachments) {
+	Dictionary definition=Dictionary(entities[rig])["skeleton_2d"];
+	PackedInt64Array bones=definition.get("bones",PackedInt64Array());
+	int declared=slot.get("bone",-1);
+	if(declared>=0 && declared<bones.size()) { return bones[declared]; }
+	// Older files did not save slot ownership. A rigid attachment's parent or the
+	// nearest common ancestor of weighted influences gives a stable legacy fallback.
+	Vector<int> influences;
+	auto add=[&](int bone) { if(bone>=0 && bone<entities.size() && bones.has(bone) && !influences.has(bone)) { influences.push_back(bone); } };
+	for(int id:attachments) {
+		Dictionary entity=entities[id],mesh=entity.get("polygon_2d",Dictionary());
+		if(int(mesh.get("skeleton",-1))==rig) {
+			PackedInt32Array indices=mesh.get("bones",PackedInt32Array());
+			PackedFloat32Array weights=mesh.get("weights",PackedFloat32Array());
+			for(int i=0;i<MIN(indices.size(),weights.size());i++) { if(weights[i]>0 && indices[i]>=0 && indices[i]<bones.size()) { add(bones[indices[i]]); } }
+		} else {
+			int parent=entity.get("parent",-1);
+			for(int step=0;parent>=0 && parent<entities.size() && step<entities.size();step++) {
+				if(bones.has(parent)) { add(parent); break; }
+				parent=Dictionary(entities[parent]).get("parent",-1);
+			}
+		}
+	}
+	if(influences.is_empty()) { return rig; }
+	int candidate=influences[0];
+	for(int steps=0;candidate>=0 && candidate<entities.size() && steps<entities.size();steps++) {
+		bool common=true;
+		for(int bone:influences) {
+			int ancestor=bone;
+			for(int depth=0;ancestor>=0 && ancestor<entities.size() && ancestor!=candidate && depth<entities.size();depth++) { ancestor=Dictionary(entities[ancestor]).get("parent",-1); }
+			if(ancestor!=candidate) { common=false; break; }
+		}
+		if(common) { return candidate==rig || bones.has(candidate) ? candidate : rig; }
+		candidate=Dictionary(entities[candidate]).get("parent",-1);
+	}
+	return rig;
+}
+}
+
 void ECSAnimationEditor::build_slot_hierarchy(const Array &entities, const Vector<TreeItem *> &rows) {
 	for (int rig = 0; rig < entities.size(); ++rig) {
 		Dictionary definition = Dictionary(entities[rig]).get("skeleton_2d", Dictionary());
@@ -36,7 +76,8 @@ void ECSAnimationEditor::build_slot_hierarchy(const Array &entities, const Vecto
 					}
 				}
 			}
-			TreeItem *parent = attachments.is_empty() ? rows[rig] : rows[attachments[0]]->get_parent();
+			int bone=slot_bone_entity(entities,rig,entry,attachments);
+			TreeItem *parent = rows[bone>=0 && bone<rows.size() ? bone : rig];
 			auto *slot = hierarchy->create_item(parent);
 			slot->set_text(0, name);
 			slot->set_icon(0, skeleton_workspace_icon("slot"));
@@ -55,6 +96,49 @@ void ECSAnimationEditor::build_slot_hierarchy(const Array &entities, const Vecto
 			}
 		}
 	}
+}
+
+bool ECSAnimationEditor::run_slot_hierarchy_self_test() {
+	Ref<ECSScene> saved=scene,test; test.instantiate();
+	Array entities; Dictionary root,first,second,rig,skins,skin;
+	root["name"]="Rig"; first["name"]="Base"; first["parent"]=0; first["bone_2d"]=Dictionary();
+	second["name"]="Tip"; second["parent"]=1; second["position"]=Vector3(50,0,0); second["bone_2d"]=Dictionary();
+	entities.push_back(root); entities.push_back(first); entities.push_back(second);
+	Array slots;
+	for(int i=0;i<4;i++) {
+		String name=i==0?"rigid":i==1?"legacy":i==2?"explicit":"empty";
+		Dictionary slot; slot["name"]=name; slot["attachment"]=i==3?String():String("image");
+		if(i>=2) { slot["bone"]=1; } slots.push_back(slot);
+		if(i==3) { continue; }
+		Dictionary image,mesh,attachment; image["name"]=name; image["parent"]=i==0?1:0;
+		mesh["polygon"]=PackedVector2Array({Vector2(),Vector2(10,0),Vector2(0,10)});
+		if(i>0) {
+			mesh["skeleton"]=0; mesh["bones"]=PackedInt32Array({0,1,0,0,0,1,0,0,0,1,0,0});
+			mesh["weights"]=PackedFloat32Array({.5,.5,0,0,.5,.5,0,0,.5,.5,0,0});
+		}
+		image["polygon_2d"]=mesh; attachment["image"]=entities.size(); skin[name]=attachment; entities.push_back(image);
+	}
+	skins["default"]=skin; rig["bones"]=PackedInt64Array({1,2}); rig["slots"]=slots; rig["skins"]=skins; root["skeleton_2d"]=rig;
+	test->set_entities(entities); edit_scene(test,nullptr);
+	bool ok=true; int found=0;
+	for(TreeItem *item=hierarchy->get_root()->get_next_in_tree();item;item=item->get_next_in_tree()) {
+		Variant metadata=item->get_metadata(0); if(metadata.get_type()!=Variant::DICTIONARY) { continue; }
+		Dictionary meta=metadata; if(!meta.has("slot") || meta.has("skin") || meta.has("placeholder")) { continue; }
+		String name=meta["slot"]; int expected=name=="rigid" || name=="legacy"?1:2;
+		ok &= item->get_parent()->get_metadata(0).get_type()==Variant::INT && int(item->get_parent()->get_metadata(0))==expected;
+		if(name!="empty") { bool image_found=false; for(TreeItem *child=item->get_first_child();child;child=child->get_next()) { image_found |= child->get_metadata(0).get_type()==Variant::INT; } ok &= image_found; }
+		found++;
+	}
+	ok &= found==4 && test->get_entities()==entities;
+	Ref<ECSWorld> world=test->instantiate(); ok &= world.is_valid();
+	if(world.is_valid()) {
+		Ref<ECSScene> captured; captured.instantiate(); ok &= captured->capture(world);
+		Array saved_slots=Dictionary(Dictionary(captured->get_entities()[0])["skeleton_2d"])["slots"];
+		ok &= int(Dictionary(saved_slots[2])["bone"])==1 && captured->instantiate().is_valid();
+	}
+	edit_scene(saved,nullptr);
+	if(ok) { print_line("SKELETON_SLOT_HIERARCHY_PASS rigid weighted_legacy explicit_owner empty_slot unchanged_mesh snapshot_roundtrip"); }
+	return ok;
 }
 
 void ECSAnimationEditor::build_slot_tools(BoxContainer *parent) {
@@ -141,7 +225,7 @@ void ECSAnimationEditor::slot_action(int action) {
     else if(action==0) { definition["active_skins"]=PackedStringArray(); if(skin_choice->get_selected()<0) { return; }active=skin_choice->get_item_text(skin_choice->get_selected()); }
 	else if(action==1) { String name=skin_name_edit->get_text().strip_edges();if(name.is_empty() || skins.has(name)) { feedback->set_text(String(U"请输入未使用的皮肤名称。"));return; }skins[name]=Dictionary(skins.get(active,Dictionary())).duplicate(true);active=name; }
 	else if(action==2) { if(active=="default") { feedback->set_text(String(U"默认皮肤保留用于附件回退。"));return; }PackedStringArray stack=definition.get("active_skins",PackedStringArray());int removed=stack.find(active);if(removed>=0) { stack.remove_at(removed); }definition["active_skins"]=stack;skins.erase(active);active="default";if(!skins.has(active)) { skins[active]=Dictionary(); } }
-	else if(action==4) { String name=slot_name_edit->get_text().strip_edges();if(name.is_empty()) { return; }for(const Variant &entry:slots) { if(String(Dictionary(entry)["name"])==name) { feedback->set_text(String(U"插槽名称已存在。"));return; } }Dictionary slot;slot["name"]=name;slot["attachment"]=String();slot["z_index"]=slots.size();slots.push_back(slot); }
+	else if(action==4) { String name=slot_name_edit->get_text().strip_edges();if(name.is_empty()) { return; }for(const Variant &entry:slots) { if(String(Dictionary(entry)["name"])==name) { feedback->set_text(String(U"插槽名称已存在。"));return; } }Dictionary slot;slot["name"]=name; int selected_bone=PackedInt64Array(definition.get("bones",PackedInt64Array())).find(target->get_selected_id()); if(selected_bone>=0) { slot["bone"]=selected_bone; } slot["attachment"]=String();slot["z_index"]=slots.size();slots.push_back(slot); }
 	else {
 		if(index<0 || index>=slots.size()) { return; }Dictionary slot=slots[index];String name=slot["name"];
 		if(action==5) { Dictionary declared=definition.get("placeholders",Dictionary());declared.erase(name);definition["placeholders"]=declared;slots.remove_at(index);for(const Variant &skin_name:skins.keys()) { Dictionary skin=skins[skin_name];skin.erase(name); } }
