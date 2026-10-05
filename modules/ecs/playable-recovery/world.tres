@@ -1,0 +1,7 @@
+[gd_resource type="ECSScene" load_steps=2 format=3]
+[sub_resource type="Environment" id="Environment"]
+background_mode = 1
+background_color = Color(0.015, 0.024, 0.042, 1)
+[resource]
+entities = []
+environment = SubResource("Environment")

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="483" height="366" viewBox="-18 -73 161 122">
+<defs><linearGradient id="skin" x1="0" y1="0" x2="0.2" y2="1"><stop stop-color="#a79ce9"/><stop offset="1" stop-color="#5b579c"/></linearGradient>
+<linearGradient id="sail" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffe3ab"/><stop offset="0.55" stop-color="#e9b192"/><stop offset="1" stop-color="#bd8bca"/></linearGradient></defs>
+<g stroke-linejoin="round" stroke-linecap="round">
+<path d="M5-11L-12-67Q20-69 30-32L48-35L83-72Q99-47 87-25C109-23 121-7 129 3L139 8Q136 29 113 30L67 26Q47 50 17 31Q-3 18 5-11Z" fill="url(#skin)"/>
+<path d="M17-34L2-60Q18-56 23-35M61-36L85-59L78-31" fill="#ffcc91"/>
+<path d="M67 12Q105 25 136 10Q129 34 103 31L61 24Z" fill="#c7d1f2"/>
+<path d="M29-11Q48-25 69-8Q46 13 29-11Z" fill="#181c36"/>
+<ellipse cx="50" cy="-9" rx="10" ry="11" fill="#ffd795"/><ellipse cx="53" cy="-10" rx="3" ry="8" fill="#28203e"/>
+<circle cx="48" cy="-13" r="3" fill="#fff5d8"/><path d="M109 0L116 2" stroke="#2b254b" stroke-width="4" stroke-linecap="round"/>
+<path d="M4 12L-12 35L12 28M13 23L-2 45L26 31" fill="#8c7bd0"/>
+<path d="M103 30L107 37L112 31" fill="#fff0d6"/></g></svg>

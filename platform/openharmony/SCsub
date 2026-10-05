@@ -1,0 +1,33 @@
+#!/usr/bin/env python
+from misc.utility.scons_hints import *
+
+from pathlib import Path
+
+import platform_openharmony_builders
+
+import version
+
+Import("env")
+
+env_openharmony = env.Clone()
+objects = [env_openharmony.SharedObject(source) for source in Glob("*.cpp")]
+lib = env_openharmony.add_shared_library("#bin/libgodot", objects, redirect_build_objects=False)
+
+if env["generate_bundle"]:
+    arch = "arm64-v8a" if env["arch"] == "arm64" else "x86_64"
+    variant = "debug" if env.debug_features else "release"
+    env_openharmony["openharmony_template_arch"] = arch
+    env_openharmony["openharmony_template_variant"] = variant
+    env_openharmony["openharmony_template_mono"] = False
+    env_openharmony["openharmony_template_runtime"] = "leanclr" if env.get("module_leanclr_enabled", False) else "none"
+    env_openharmony["openharmony_template_gles3"] = bool(env["opengl3"])
+    env_openharmony["openharmony_template_version"] = f"{version.major}.{version.minor}.{version.patch}"
+    template_root = Path(Dir("#misc/dist/openharmony_template").abspath)
+    sources = [lib[0], File("bridge_openharmony.h")]
+    sources += [File(str(path)) for path in sorted(template_root.rglob("*")) if path.is_file()]
+    env_openharmony["openharmony_template_root"] = str(template_root)
+    env_openharmony.CommandNoCache(
+        f"#bin/openharmony_{variant}_{arch}{'_leanclr' if env.get('module_leanclr_enabled', False) else ''}.zip",
+        sources,
+        env_openharmony.Run(platform_openharmony_builders.generate_bundle),
+    )

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="636" height="336" viewBox="-102 -56 212 112">
+<defs><linearGradient id="skin" x1="0" y1="0" x2="0.2" y2="1"><stop stop-color="#a79ce9"/><stop offset="1" stop-color="#5b579c"/></linearGradient>
+<linearGradient id="sail" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffe3ab"/><stop offset="0.55" stop-color="#e9b192"/><stop offset="1" stop-color="#bd8bca"/></linearGradient></defs>
+<g stroke-linejoin="round" stroke-linecap="round">
+<path d="M-95 6C-89-35-47-52 8-40C44-33 73-35 96-12C116 9 73 35 36 36C-13 55-69 45-95 6Z" fill="url(#skin)"/>
+<path d="M-83 13C-40 44 29 24 92-5C89 27 31 48-20 43C-53 44-73 32-83 13Z" fill="#adbce9"/>
+<path d="M-74-19Q-49-53-26-32L-11-54L5-34L22-48L38-30" fill="#decaff"/>
+<path d="M-55-12Q-10-30 47-16" fill="none" stroke="#c8baff" stroke-width="5"/>
+<path d="M-28 27L-23 39M-8 22L-1 39M14 15L23 33M35 8L43 25" stroke="#7885b5" stroke-width="3"/>
+<circle cx="-56" cy="4" r="4" fill="#fcd398"/><circle cx="-40" cy="-3" r="3" fill="#fcd398"/></g></svg>

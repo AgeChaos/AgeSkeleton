@@ -1,0 +1,13 @@
+{
+  "name": "Moonwing",
+  "copyright": "2026 AgeSkeleton contributors",
+  "license": "MIT",
+  "generator": "tools/generate_moonwing.py",
+  "source": "Vector paths, joint layout, skin weights and periodic motion authored in this generator; no imported third-party character, rig or motion data.",
+  "bones": 12,
+  "attachments": 10,
+  "animations": [
+    "Soar",
+    "Glide"
+  ]
+}

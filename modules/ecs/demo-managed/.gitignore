@@ -1,0 +1,6 @@
+.godot/
+bin/
+obj/
+leanclr/
+Build/bin/
+Build/obj/

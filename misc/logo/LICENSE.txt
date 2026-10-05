@@ -1,0 +1,8 @@
+Godot Engine Logo
+Copyright (c) 2017 Andrea Calabró
+
+This work is licensed under the Creative Commons Attribution 4.0 International
+license (CC BY 4.0 International): https://creativecommons.org/licenses/by/4.0/
+
+AgeChaos 替换图标 icon.svg 和 icon.png 为独立新设计，适用根目录 LICENSE.AgeChaos.txt。
+以上 Godot 署名继续适用于本目录保留的原始 Godot 图形。

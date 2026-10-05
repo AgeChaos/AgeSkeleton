@@ -1,0 +1,80 @@
+[gd_resource type="ECSScene" load_steps=5 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Blue"]
+shading_mode = 0
+albedo_color = Color(0.1, 0.5, 1, 1)
+
+[sub_resource type="StandardMaterial3D" id="Orange"]
+shading_mode = 0
+albedo_color = Color(1, 0.4, 0.1, 1)
+
+[sub_resource type="BoxMesh" id="Box"]
+size = Vector3(1, 1, 1)
+
+[sub_resource type="SphereMesh" id="Sphere"]
+radius = 0.6
+height = 1.2
+
+[resource]
+entities = [{
+"position": Vector3(-2, 0, 0),
+"rotation": Vector3(0, 0.6, 0),
+"scale": Vector3(1.5, 1.5, 1.5),
+"mesh": SubResource("Box"),
+"material": SubResource("Blue"),
+"parent": -1
+}, {
+"position": Vector3(2, 0, 0),
+"mesh": SubResource("Sphere"),
+"material": SubResource("Orange"),
+"parent": 0
+}, {
+"position": Vector3(3, 0, 0),
+"mesh": SubResource("Box"),
+"material": SubResource("Orange"),
+"parent": -1
+}, {
+"parent": -1,
+"ui": {
+"kind": "panel", "rect": Rect2(24, 24, 340, 328),
+"background": Color(0.04, 0.07, 0.12, 0.96)
+}
+}, {
+"parent": 3,
+"ui": {
+"kind": "label", "rect": Rect2(16, 12, 308, 48),
+"text": "AgeChaos / ECS UI", "font_size": 24,
+"background": Color(0, 0, 0, 0), "block_pointer": false
+}
+}, {
+"parent": 3,
+"ui": {
+"kind": "button", "rect": Rect2(16, 68, 308, 42),
+"text": "Button - native ECS event", "background": Color(0.08, 0.3, 0.55, 1)
+}
+}, {
+"parent": 3,
+"ui": {
+"kind": "toggle", "rect": Rect2(16, 120, 308, 42),
+"text": "Toggle", "value": 0.0
+}
+}, {
+"parent": 3,
+"ui": {
+"kind": "slider", "rect": Rect2(16, 176, 308, 28),
+"value": 0.35, "foreground": Color(0.15, 0.65, 0.95, 1)
+}
+}, {
+"parent": 3,
+"ui": {
+"kind": "progress", "rect": Rect2(16, 222, 308, 12),
+"value": 0.7, "foreground": Color(0.15, 0.8, 0.4, 1)
+}
+}, {
+"parent": 3,
+"ui": {
+"kind": "label", "rect": Rect2(16, 250, 308, 64),
+"text": "Mouse / touch / Tab / Enter\nOne World. No game Nodes.", "font_size": 17,
+"background": Color(0, 0, 0, 0), "block_pointer": false
+}
+}]

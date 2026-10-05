@@ -1,0 +1,583 @@
+[gd_resource type="ECSScene" load_steps=9 format=3]
+
+[ext_resource type="Texture2D" path="res://Assets/body.svg" id="1"]
+[ext_resource type="Texture2D" path="res://Assets/head.svg" id="2"]
+[ext_resource type="Texture2D" path="res://Assets/tail.svg" id="3"]
+[ext_resource type="Texture2D" path="res://Assets/tail_tip.svg" id="4"]
+[ext_resource type="Texture2D" path="res://Assets/wing.svg" id="5"]
+[ext_resource type="Texture2D" path="res://Assets/leg.svg" id="6"]
+
+[sub_resource type="Animation" id="Soar"]
+resource_name = "Soar"
+length = 2.4
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/path = NodePath(".:rotation")
+tracks/0/interp = 2
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.3, 0.6, 0.9, 1.2, 1.5, 1.8, 2.1, 2.4),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 0, 0.024749), Vector3(0, 0, 0.035), Vector3(0, 0, 0.024749), Vector3(0, 0, 0), Vector3(0, 0, -0.024749), Vector3(0, 0, -0.035), Vector3(0, 0, -0.024749), Vector3(0, 0, -0)]
+}
+tracks/1/type = "value"
+tracks/1/path = NodePath(".:rotation")
+tracks/1/interp = 2
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.3, 0.6, 0.9, 1.2, 1.5, 1.8, 2.1, 2.4),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, -0.074905), Vector3(0, 0, -0.050255), Vector3(0, 0, -0.066461), Vector3(0, 0, -0.114029), Vector3(0, 0, -0.165095), Vector3(0, 0, -0.189745), Vector3(0, 0, -0.173539), Vector3(0, 0, -0.125971), Vector3(0, 0, -0.074905)]
+}
+tracks/2/type = "value"
+tracks/2/path = NodePath(".:rotation")
+tracks/2/interp = 2
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.3, 0.6, 0.9, 1.2, 1.5, 1.8, 2.1, 2.4),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 3.096356), Vector3(0, 0, 3.087049), Vector3(0, 0, 3.02675), Vector3(0, 0, 2.950781), Vector3(0, 0, 2.903644), Vector3(0, 0, 2.912951), Vector3(0, 0, 2.97325), Vector3(0, 0, 3.049219), Vector3(0, 0, 3.096356)]
+}
+tracks/3/type = "value"
+tracks/3/path = NodePath(".:rotation")
+tracks/3/interp = 2
+tracks/3/keys = {
+"times": PackedFloat32Array(0, 0.3, 0.6, 0.9, 1.2, 1.5, 1.8, 2.1, 2.4),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, -0.145419), Vector3(0, 0, -0.240719), Vector3(0, 0, -0.370745), Vector3(0, 0, -0.459329), Vector3(0, 0, -0.454581), Vector3(0, 0, -0.359281), Vector3(0, 0, -0.229255), Vector3(0, 0, -0.140671), Vector3(0, 0, -0.145419)]
+}
+tracks/4/type = "value"
+tracks/4/path = NodePath(".:rotation")
+tracks/4/interp = 2
+tracks/4/keys = {
+"times": PackedFloat32Array(0, 0.3, 0.6, 0.9, 1.2, 1.5, 1.8, 2.1, 2.4),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, -0.967254), Vector3(0, 0, -0.802343), Vector3(0, 0, -0.782506), Vector3(0, 0, -0.919363), Vector3(0, 0, -1.132746), Vector3(0, 0, -1.297657), Vector3(0, 0, -1.317494), Vector3(0, 0, -1.180637), Vector3(0, 0, -0.967254)]
+}
+tracks/5/type = "value"
+tracks/5/path = NodePath(".:rotation")
+tracks/5/interp = 2
+tracks/5/keys = {
+"times": PackedFloat32Array(0, 0.3, 0.6, 0.9, 1.2, 1.5, 1.8, 2.1, 2.4),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0.133681), Vector3(0, 0, 0.142638), Vector3(0, 0, 0.068039), Vector3(0, 0, -0.046416), Vector3(0, 0, -0.133681), Vector3(0, 0, -0.142638), Vector3(0, 0, -0.068039), Vector3(0, 0, 0.046416), Vector3(0, 0, 0.133681)]
+}
+tracks/6/type = "value"
+tracks/6/path = NodePath(".:rotation")
+tracks/6/interp = 2
+tracks/6/keys = {
+"times": PackedFloat32Array(0, 0.3, 0.6, 0.9, 1.2, 1.5, 1.8, 2.1, 2.4),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, -2.05), Vector3(0, 0, -1.795442), Vector3(0, 0, -1.69), Vector3(0, 0, -1.795442), Vector3(0, 0, -2.05), Vector3(0, 0, -2.304558), Vector3(0, 0, -2.41), Vector3(0, 0, -2.304558), Vector3(0, 0, -2.05)]
+}
+tracks/7/type = "value"
+tracks/7/path = NodePath(".:rotation")
+tracks/7/interp = 2
+tracks/7/keys = {
+"times": PackedFloat32Array(0, 0.3, 0.6, 0.9, 1.2, 1.5, 1.8, 2.1, 2.4),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0.150645), Vector3(0, 0, 0.209978), Vector3(0, 0, 0.146308), Vector3(0, 0, -0.003066), Vector3(0, 0, -0.150645), Vector3(0, 0, -0.209978), Vector3(0, 0, -0.146308), Vector3(0, 0, 0.003066), Vector3(0, 0, 0.150645)]
+}
+tracks/8/type = "value"
+tracks/8/path = NodePath(".:rotation")
+tracks/8/interp = 2
+tracks/8/keys = {
+"times": PackedFloat32Array(0, 0.3, 0.6, 0.9, 1.2, 1.5, 1.8, 2.1, 2.4),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0.82673), Vector3(0, 0, 0.891198), Vector3(0, 0, 0.890527), Vector3(0, 0, 0.825111), Vector3(0, 0, 0.73327), Vector3(0, 0, 0.668802), Vector3(0, 0, 0.669473), Vector3(0, 0, 0.734889), Vector3(0, 0, 0.82673)]
+}
+tracks/9/type = "value"
+tracks/9/path = NodePath(".:rotation")
+tracks/9/interp = 2
+tracks/9/keys = {
+"times": PackedFloat32Array(0, 0.3, 0.6, 0.9, 1.2, 1.5, 1.8, 2.1, 2.4),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 1.15798), Vector3(0, 0, 1.189672), Vector3(0, 0, 1.168836), Vector3(0, 0, 1.107676), Vector3(0, 0, 1.04202), Vector3(0, 0, 1.010328), Vector3(0, 0, 1.031164), Vector3(0, 0, 1.092324), Vector3(0, 0, 1.15798)]
+}
+tracks/10/type = "value"
+tracks/10/path = NodePath(".:rotation")
+tracks/10/interp = 2
+tracks/10/keys = {
+"times": PackedFloat32Array(0, 0.3, 0.6, 0.9, 1.2, 1.5, 1.8, 2.1, 2.4),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 1.612562), Vector3(0, 0, 1.627477), Vector3(0, 0, 1.579433), Vector3(0, 0, 1.496575), Vector3(0, 0, 1.427438), Vector3(0, 0, 1.412523), Vector3(0, 0, 1.460567), Vector3(0, 0, 1.543425), Vector3(0, 0, 1.612562)]
+}
+tracks/11/type = "value"
+tracks/11/path = NodePath(".:rotation")
+tracks/11/interp = 2
+tracks/11/keys = {
+"times": PackedFloat32Array(0, 0.3, 0.6, 0.9, 1.2, 1.5, 1.8, 2.1, 2.4),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 1.236356), Vector3(0, 0, 1.227049), Vector3(0, 0, 1.16675), Vector3(0, 0, 1.090781), Vector3(0, 0, 1.043644), Vector3(0, 0, 1.052951), Vector3(0, 0, 1.11325), Vector3(0, 0, 1.189219), Vector3(0, 0, 1.236356)]
+}
+tracks/12/type = "value"
+tracks/12/path = NodePath(".:position")
+tracks/12/interp = 2
+tracks/12/keys = {
+"times": PackedFloat32Array(0, 0.3, 0.6, 0.9, 1.2, 1.5, 1.8, 2.1, 2.4),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 6.363961, 0), Vector3(0, 9, 0), Vector3(0, 6.363961, 0), Vector3(0, 0, 0), Vector3(0, -6.363961, 0), Vector3(0, -9, 0), Vector3(0, -6.363961, 0), Vector3(0, -0, 0)]
+}
+
+[sub_resource type="Animation" id="Glide"]
+resource_name = "Glide"
+length = 3.2
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/path = NodePath(".:rotation")
+tracks/0/interp = 2
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.4, 0.8, 1.2, 1.6, 2, 2.4, 2.8, 3.2),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 0, 0.00693), Vector3(0, 0, 0.0098), Vector3(0, 0, 0.00693), Vector3(0, 0, 0), Vector3(0, 0, -0.00693), Vector3(0, 0, -0.0098), Vector3(0, 0, -0.00693), Vector3(0, 0, -0)]
+}
+tracks/1/type = "value"
+tracks/1/path = NodePath(".:rotation")
+tracks/1/interp = 2
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.4, 0.8, 1.2, 1.6, 2, 2.4, 2.8, 3.2),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, -0.107373), Vector3(0, 0, -0.100471), Vector3(0, 0, -0.105009), Vector3(0, 0, -0.118328), Vector3(0, 0, -0.132627), Vector3(0, 0, -0.139529), Vector3(0, 0, -0.134991), Vector3(0, 0, -0.121672), Vector3(0, 0, -0.107373)]
+}
+tracks/2/type = "value"
+tracks/2/path = NodePath(".:rotation")
+tracks/2/interp = 2
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.4, 0.8, 1.2, 1.6, 2, 2.4, 2.8, 3.2),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 3.02698), Vector3(0, 0, 3.024374), Vector3(0, 0, 3.00749), Vector3(0, 0, 2.986219), Vector3(0, 0, 2.97302), Vector3(0, 0, 2.975626), Vector3(0, 0, 2.99251), Vector3(0, 0, 3.013781), Vector3(0, 0, 3.02698)]
+}
+tracks/3/type = "value"
+tracks/3/path = NodePath(".:rotation")
+tracks/3/interp = 2
+tracks/3/keys = {
+"times": PackedFloat32Array(0, 0.4, 0.8, 1.2, 1.6, 2, 2.4, 2.8, 3.2),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, -0.256717), Vector3(0, 0, -0.283401), Vector3(0, 0, -0.319809), Vector3(0, 0, -0.344612), Vector3(0, 0, -0.343283), Vector3(0, 0, -0.316599), Vector3(0, 0, -0.280191), Vector3(0, 0, -0.255388), Vector3(0, 0, -0.256717)]
+}
+tracks/4/type = "value"
+tracks/4/path = NodePath(".:rotation")
+tracks/4/interp = 2
+tracks/4/keys = {
+"times": PackedFloat32Array(0, 0.4, 0.8, 1.2, 1.6, 2, 2.4, 2.8, 3.2),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, -1.026831), Vector3(0, 0, -0.980656), Vector3(0, 0, -0.975102), Vector3(0, 0, -1.013422), Vector3(0, 0, -1.073169), Vector3(0, 0, -1.119344), Vector3(0, 0, -1.124898), Vector3(0, 0, -1.086578), Vector3(0, 0, -1.026831)]
+}
+tracks/5/type = "value"
+tracks/5/path = NodePath(".:rotation")
+tracks/5/interp = 2
+tracks/5/keys = {
+"times": PackedFloat32Array(0, 0.4, 0.8, 1.2, 1.6, 2, 2.4, 2.8, 3.2),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0.037431), Vector3(0, 0, 0.039939), Vector3(0, 0, 0.019051), Vector3(0, 0, -0.012996), Vector3(0, 0, -0.037431), Vector3(0, 0, -0.039939), Vector3(0, 0, -0.019051), Vector3(0, 0, 0.012996), Vector3(0, 0, 0.037431)]
+}
+tracks/6/type = "value"
+tracks/6/path = NodePath(".:rotation")
+tracks/6/interp = 2
+tracks/6/keys = {
+"times": PackedFloat32Array(0, 0.4, 0.8, 1.2, 1.6, 2, 2.4, 2.8, 3.2),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, -2.05), Vector3(0, 0, -1.978724), Vector3(0, 0, -1.9492), Vector3(0, 0, -1.978724), Vector3(0, 0, -2.05), Vector3(0, 0, -2.121276), Vector3(0, 0, -2.1508), Vector3(0, 0, -2.121276), Vector3(0, 0, -2.05)]
+}
+tracks/7/type = "value"
+tracks/7/path = NodePath(".:rotation")
+tracks/7/interp = 2
+tracks/7/keys = {
+"times": PackedFloat32Array(0, 0.4, 0.8, 1.2, 1.6, 2, 2.4, 2.8, 3.2),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0.042181), Vector3(0, 0, 0.058794), Vector3(0, 0, 0.040966), Vector3(0, 0, -0.000859), Vector3(0, 0, -0.042181), Vector3(0, 0, -0.058794), Vector3(0, 0, -0.040966), Vector3(0, 0, 0.000859), Vector3(0, 0, 0.042181)]
+}
+tracks/8/type = "value"
+tracks/8/path = NodePath(".:rotation")
+tracks/8/interp = 2
+tracks/8/keys = {
+"times": PackedFloat32Array(0, 0.4, 0.8, 1.2, 1.6, 2, 2.4, 2.8, 3.2),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0.793084), Vector3(0, 0, 0.811135), Vector3(0, 0, 0.810948), Vector3(0, 0, 0.792631), Vector3(0, 0, 0.766916), Vector3(0, 0, 0.748865), Vector3(0, 0, 0.749052), Vector3(0, 0, 0.767369), Vector3(0, 0, 0.793084)]
+}
+tracks/9/type = "value"
+tracks/9/path = NodePath(".:rotation")
+tracks/9/interp = 2
+tracks/9/keys = {
+"times": PackedFloat32Array(0, 0.4, 0.8, 1.2, 1.6, 2, 2.4, 2.8, 3.2),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 1.116234), Vector3(0, 0, 1.125108), Vector3(0, 0, 1.119274), Vector3(0, 0, 1.102149), Vector3(0, 0, 1.083766), Vector3(0, 0, 1.074892), Vector3(0, 0, 1.080726), Vector3(0, 0, 1.097851), Vector3(0, 0, 1.116234)]
+}
+tracks/10/type = "value"
+tracks/10/path = NodePath(".:rotation")
+tracks/10/interp = 2
+tracks/10/keys = {
+"times": PackedFloat32Array(0, 0.4, 0.8, 1.2, 1.6, 2, 2.4, 2.8, 3.2),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 1.545917), Vector3(0, 0, 1.550093), Vector3(0, 0, 1.536641), Vector3(0, 0, 1.513441), Vector3(0, 0, 1.494083), Vector3(0, 0, 1.489907), Vector3(0, 0, 1.503359), Vector3(0, 0, 1.526559), Vector3(0, 0, 1.545917)]
+}
+tracks/11/type = "value"
+tracks/11/path = NodePath(".:rotation")
+tracks/11/interp = 2
+tracks/11/keys = {
+"times": PackedFloat32Array(0, 0.4, 0.8, 1.2, 1.6, 2, 2.4, 2.8, 3.2),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 1.16698), Vector3(0, 0, 1.164374), Vector3(0, 0, 1.14749), Vector3(0, 0, 1.126219), Vector3(0, 0, 1.11302), Vector3(0, 0, 1.115626), Vector3(0, 0, 1.13251), Vector3(0, 0, 1.153781), Vector3(0, 0, 1.16698)]
+}
+tracks/12/type = "value"
+tracks/12/path = NodePath(".:position")
+tracks/12/interp = 2
+tracks/12/keys = {
+"times": PackedFloat32Array(0, 0.4, 0.8, 1.2, 1.6, 2, 2.4, 2.8, 3.2),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 1.781909, 0), Vector3(0, 2.52, 0), Vector3(0, 1.781909, 0), Vector3(0, 0, 0), Vector3(0, -1.781909, 0), Vector3(0, -2.52, 0), Vector3(0, -1.781909, 0), Vector3(0, -0, 0)]
+}
+
+[resource]
+entities = [{
+"name": "Moonwing",
+"skeleton_2d": {
+"bones": PackedInt64Array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12),
+"bind_poses": [Transform2D(1, 0, -0, 1, 0, 0), Transform2D(0.992809, -0.119712, 0.119712, 0.992809, 75, -18), Transform2D(-0.989992, 0.14112, -0.14112, -0.989992, -84, 9), Transform2D(-0.904072, 0.42738, -0.42738, -0.904072, -194.87916, 24.805441), Transform2D(0.497571, -0.867423, 0.867423, 0.497571, -16, -24), Transform2D(0.497571, -0.867423, 0.867423, 0.497571, 27.288681, -99.465821), Transform2D(-0.461073, -0.887362, 0.887362, -0.461073, -5, -24), Transform2D(-0.461073, -0.887362, 0.887362, -0.461073, -45.113324, -101.200526), Transform2D(0.710914, 0.703279, -0.703279, 0.710914, 49, 20), Transform2D(0.453596, 0.891207, -0.891207, 0.453596, -56, 20), Transform2D(0.050774, 0.99871, -0.99871, 0.050774, -56, 29), Transform2D(0.417595, 0.908633, -0.908633, 0.417595, 51, 22)],
+"slots": [{
+"name": "Far Wing",
+"attachment": "Far Wing",
+"z_index": 0
+}, {
+"name": "Far Back Paw",
+"attachment": "Far Back Paw",
+"z_index": 1
+}, {
+"name": "Far Front Paw",
+"attachment": "Far Front Paw",
+"z_index": 2
+}, {
+"name": "Tail",
+"attachment": "Tail",
+"z_index": 3
+}, {
+"name": "Tail Fan",
+"attachment": "Tail Fan",
+"z_index": 4
+}, {
+"name": "Body",
+"attachment": "Body",
+"z_index": 5
+}, {
+"name": "Near Back Paw",
+"attachment": "Near Back Paw",
+"z_index": 6
+}, {
+"name": "Head",
+"attachment": "Head",
+"z_index": 7
+}, {
+"name": "Near Front Paw",
+"attachment": "Near Front Paw",
+"z_index": 8
+}, {
+"name": "Near Wing",
+"attachment": "Near Wing",
+"z_index": 9
+}],
+"skins": {
+"default": {
+"Far Wing": {
+"Far Wing": 13
+},
+"Far Back Paw": {
+"Far Back Paw": 14
+},
+"Far Front Paw": {
+"Far Front Paw": 15
+},
+"Tail": {
+"Tail": 16
+},
+"Tail Fan": {
+"Tail Fan": 17
+},
+"Body": {
+"Body": 18
+},
+"Near Back Paw": {
+"Near Back Paw": 19
+},
+"Head": {
+"Head": 20
+},
+"Near Front Paw": {
+"Near Front Paw": 21
+},
+"Near Wing": {
+"Near Wing": 22
+}
+}
+},
+"skin": "default",
+"attachment_library": PackedInt64Array(13, 14, 15, 16, 17, 18, 19, 20, 21, 22)
+},
+"animation": {
+"clip": SubResource("Soar"),
+"state": "Soar",
+"states": {
+"Soar": SubResource("Soar"),
+"Glide": SubResource("Glide")
+},
+"targets": PackedInt64Array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 1)
+}
+}, {
+"name": "Core",
+"parent": 0,
+"position": Vector3(0, 0, 0),
+"rotation": Vector3(0, 0, 0),
+"bone_2d": {
+"length": 90
+}
+}, {
+"name": "Neck",
+"parent": 1,
+"position": Vector3(75, -18, 0),
+"rotation": Vector3(0, 0, -0.12),
+"bone_2d": {
+"length": 85
+}
+}, {
+"name": "Tail Base",
+"parent": 1,
+"position": Vector3(-84, 9, 0),
+"rotation": Vector3(0, 0, 3),
+"bone_2d": {
+"length": 112
+}
+}, {
+"name": "Tail Fin",
+"parent": 3,
+"position": Vector3(112, 0, 0),
+"rotation": Vector3(0, 0, -0.3),
+"bone_2d": {
+"length": 105
+}
+}, {
+"name": "Far Sail",
+"parent": 1,
+"position": Vector3(-16, -24, 0),
+"rotation": Vector3(0, 0, -1.05),
+"bone_2d": {
+"length": 87
+}
+}, {
+"name": "Far Wrist",
+"parent": 5,
+"position": Vector3(87, 0, 0),
+"rotation": Vector3(0, 0, 0),
+"bone_2d": {
+"length": 96
+}
+}, {
+"name": "Near Sail",
+"parent": 1,
+"position": Vector3(-5, -24, 0),
+"rotation": Vector3(0, 0, -2.05),
+"bone_2d": {
+"length": 87
+}
+}, {
+"name": "Near Wrist",
+"parent": 7,
+"position": Vector3(87, 0, 0),
+"rotation": Vector3(0, 0, 0),
+"bone_2d": {
+"length": 96
+}
+}, {
+"name": "Far Foreleg",
+"parent": 1,
+"position": Vector3(49, 20, 0),
+"rotation": Vector3(0, 0, 0.78),
+"bone_2d": {
+"length": 68
+}
+}, {
+"name": "Far Hindleg",
+"parent": 1,
+"position": Vector3(-56, 20, 0),
+"rotation": Vector3(0, 0, 1.1),
+"bone_2d": {
+"length": 68
+}
+}, {
+"name": "Near Hindleg",
+"parent": 1,
+"position": Vector3(-56, 29, 0),
+"rotation": Vector3(0, 0, 1.52),
+"bone_2d": {
+"length": 68
+}
+}, {
+"name": "Near Foreleg",
+"parent": 1,
+"position": Vector3(51, 22, 0),
+"rotation": Vector3(0, 0, 1.14),
+"bone_2d": {
+"length": 68
+}
+}, {
+"name": "Far Wing",
+"parent": 0,
+"polygon_2d": {
+"polygon": PackedVector2Array(-89.145598, -45.206639, -62.276761, -92.047494, -35.407924, -138.888348, -8.539088, -185.729202, 18.329749, -232.570056, -41.148179, -17.674375, -14.279342, -64.515229, 12.589494, -111.356083, 39.458331, -158.196937, 66.327167, -205.037792, 6.849239, 9.85789, 33.718076, -36.982964, 60.586913, -83.823819, 87.455749, -130.664673, 114.324586, -177.505527, 54.846658, 37.390154, 81.715494, -9.4507, 108.584331, -56.291554, 135.453168, -103.132408, 162.322004, -149.973262),
+"uv": PackedVector2Array(0, 0, 0.25, 0, 0.5, 0, 0.75, 0, 1, 0, 0, 0.333333, 0.25, 0.333333, 0.5, 0.333333, 0.75, 0.333333, 1, 0.333333, 0, 0.666667, 0.25, 0.666667, 0.5, 0.666667, 0.75, 0.666667, 1, 0.666667, 0, 1, 0.25, 1, 0.5, 1, 0.75, 1, 1, 1),
+"triangles": PackedInt32Array(0, 1, 5, 1, 6, 5, 1, 2, 6, 2, 7, 6, 2, 3, 7, 3, 8, 7, 3, 4, 8, 4, 9, 8, 5, 6, 10, 6, 11, 10, 6, 7, 11, 7, 12, 11, 7, 8, 12, 8, 13, 12, 8, 9, 13, 9, 14, 13, 10, 11, 15, 11, 16, 15, 11, 12, 16, 12, 17, 16, 12, 13, 17, 13, 18, 17, 13, 14, 18, 14, 19, 18),
+"texture": ExtResource("5"),
+"skeleton": 0,
+"bones": PackedInt32Array(4, 5, 0, 0, 4, 5, 0, 0, 4, 5, 0, 0, 4, 5, 0, 0, 4, 5, 0, 0, 4, 5, 0, 0, 4, 5, 0, 0, 4, 5, 0, 0, 4, 5, 0, 0, 4, 5, 0, 0, 4, 5, 0, 0, 4, 5, 0, 0, 4, 5, 0, 0, 4, 5, 0, 0, 4, 5, 0, 0, 4, 5, 0, 0, 4, 5, 0, 0, 4, 5, 0, 0, 4, 5, 0, 0, 4, 5, 0, 0),
+"weights": PackedFloat32Array(1, 0, 0, 0, 1, 0, 0, 0, 0.654545, 0.345455, 0, 0, 0.163636, 0.836364, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0.654545, 0.345455, 0, 0, 0.163636, 0.836364, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0.654545, 0.345455, 0, 0, 0.163636, 0.836364, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0.654545, 0.345455, 0, 0, 0.163636, 0.836364, 0, 0, 0, 1, 0, 0),
+"color": Color(0.66, 0.66, 0.66, 1),
+"z_index": 0
+}
+}, {
+"name": "Far Back Paw",
+"parent": 0,
+"polygon_2d": {
+"polygon": PackedVector2Array(-42.322157, -6.036832, 7.573416, 91.995978, -99.359428, 22.99332, -49.463855, 121.026129),
+"uv": PackedVector2Array(0, 0, 1, 0, 0, 1, 1, 1),
+"triangles": PackedInt32Array(0, 1, 2, 1, 3, 2),
+"texture": ExtResource("6"),
+"skeleton": 0,
+"bones": PackedInt32Array(9, 0, 0, 0, 9, 0, 0, 0, 9, 0, 0, 0, 9, 0, 0, 0),
+"weights": PackedFloat32Array(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0),
+"color": Color(0.64, 0.64, 0.64, 1),
+"z_index": 1
+}
+}, {
+"name": "Far Front Paw",
+"parent": 0,
+"polygon_2d": {
+"polygon": PackedVector2Array(53.793176, -9.017675, 131.993665, 68.343061, 8.783293, 36.480791, 86.983782, 113.841528),
+"uv": PackedVector2Array(0, 0, 1, 0, 0, 1, 1, 1),
+"triangles": PackedInt32Array(0, 1, 2, 1, 3, 2),
+"texture": ExtResource("6"),
+"skeleton": 0,
+"bones": PackedInt32Array(8, 0, 0, 0, 8, 0, 0, 0, 8, 0, 0, 0, 8, 0, 0, 0),
+"weights": PackedFloat32Array(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0),
+"color": Color(0.64, 0.64, 0.64, 1),
+"z_index": 2
+}
+}, {
+"name": "Tail",
+"parent": 0,
+"polygon_2d": {
+"polygon": PackedVector2Array(-67.60425, 38.98632, -217.093117, 60.295441, -76.77705, -25.363192, -226.265917, -4.054071),
+"uv": PackedVector2Array(0, 0, 1, 0, 0, 1, 1, 1),
+"triangles": PackedInt32Array(0, 1, 2, 1, 3, 2),
+"texture": ExtResource("3"),
+"skeleton": 0,
+"bones": PackedInt32Array(2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0),
+"weights": PackedFloat32Array(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0),
+"color": Color(1, 1, 1, 1),
+"z_index": 3
+}
+}, {
+"name": "Tail Fan",
+"parent": 0,
+"polygon_2d": {
+"polygon": PackedVector2Array(-163.614684, 67.543393, -299.225506, 131.650376, -209.344332, -29.192326, -344.955153, 34.914656),
+"uv": PackedVector2Array(0, 0, 1, 0, 0, 1, 1, 1),
+"triangles": PackedInt32Array(0, 1, 2, 1, 3, 2),
+"texture": ExtResource("4"),
+"skeleton": 0,
+"bones": PackedInt32Array(3, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0),
+"weights": PackedFloat32Array(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0),
+"color": Color(1, 1, 1, 1),
+"z_index": 4
+}
+}, {
+"name": "Body",
+"parent": 0,
+"polygon_2d": {
+"polygon": PackedVector2Array(-102, -56, 110, -56, -102, 56, 110, 56),
+"uv": PackedVector2Array(0, 0, 1, 0, 0, 1, 1, 1),
+"triangles": PackedInt32Array(0, 1, 2, 1, 3, 2),
+"texture": ExtResource("1"),
+"skeleton": 0,
+"bones": PackedInt32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+"weights": PackedFloat32Array(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0),
+"color": Color(1, 1, 1, 1),
+"z_index": 5
+}
+}, {
+"name": "Near Back Paw",
+"parent": 0,
+"polygon_2d": {
+"polygon": PackedVector2Array(-32.894123, 10.80334, -27.308929, 120.661456, -96.811572, 14.052907, -91.226379, 123.911023),
+"uv": PackedVector2Array(0, 0, 1, 0, 0, 1, 1, 1),
+"triangles": PackedInt32Array(0, 1, 2, 1, 3, 2),
+"texture": ExtResource("6"),
+"skeleton": 0,
+"bones": PackedInt32Array(10, 0, 0, 0, 10, 0, 0, 0, 10, 0, 0, 0, 10, 0, 0, 0),
+"weights": PackedFloat32Array(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0),
+"color": Color(1, 1, 1, 1),
+"z_index": 6
+}
+}, {
+"name": "Head",
+"parent": 0,
+"polygon_2d": {
+"polygon": PackedVector2Array(48.390453, -88.320211, 208.232644, -107.593876, 62.995343, 32.802443, 222.837533, 13.528778),
+"uv": PackedVector2Array(0, 0, 1, 0, 0, 1, 1, 1),
+"triangles": PackedInt32Array(0, 1, 2, 1, 3, 2),
+"texture": ExtResource("2"),
+"skeleton": 0,
+"bones": PackedInt32Array(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0),
+"weights": PackedFloat32Array(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0),
+"color": Color(1, 1, 1, 1),
+"z_index": 7
+}
+}, {
+"name": "Near Front Paw",
+"parent": 0,
+"polygon_2d": {
+"polygon": PackedVector2Array(65.708097, -3.469038, 111.643493, 96.480647, 7.555554, 23.257011, 53.490949, 123.206695),
+"uv": PackedVector2Array(0, 0, 1, 0, 0, 1, 1, 1),
+"triangles": PackedInt32Array(0, 1, 2, 1, 3, 2),
+"texture": ExtResource("6"),
+"skeleton": 0,
+"bones": PackedInt32Array(11, 0, 0, 0, 11, 0, 0, 0, 11, 0, 0, 0, 11, 0, 0, 0),
+"weights": PackedFloat32Array(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0),
+"color": Color(1, 1, 1, 1),
+"z_index": 8
+}
+}, {
+"name": "Near Wing",
+"parent": 0,
+"polygon_2d": {
+"polygon": PackedVector2Array(-62.365507, 26.091902, -87.263432, -21.825666, -112.161358, -69.743234, -137.059283, -117.660802, -161.957208, -165.57837, -13.264789, 0.579213, -38.162714, -47.338355, -63.06064, -95.255923, -87.958565, -143.173491, -112.85649, -191.091059, 35.835929, -24.933476, 10.938003, -72.851044, -13.959922, -120.768612, -38.857847, -168.68618, -63.755773, -216.603748, 84.936646, -50.446165, 60.038721, -98.363733, 35.140796, -146.281301, 10.24287, -194.198869, -14.655055, -242.116437),
+"uv": PackedVector2Array(0, 0, 0.25, 0, 0.5, 0, 0.75, 0, 1, 0, 0, 0.333333, 0.25, 0.333333, 0.5, 0.333333, 0.75, 0.333333, 1, 0.333333, 0, 0.666667, 0.25, 0.666667, 0.5, 0.666667, 0.75, 0.666667, 1, 0.666667, 0, 1, 0.25, 1, 0.5, 1, 0.75, 1, 1, 1),
+"triangles": PackedInt32Array(0, 1, 5, 1, 6, 5, 1, 2, 6, 2, 7, 6, 2, 3, 7, 3, 8, 7, 3, 4, 8, 4, 9, 8, 5, 6, 10, 6, 11, 10, 6, 7, 11, 7, 12, 11, 7, 8, 12, 8, 13, 12, 8, 9, 13, 9, 14, 13, 10, 11, 15, 11, 16, 15, 11, 12, 16, 12, 17, 16, 12, 13, 17, 13, 18, 17, 13, 14, 18, 14, 19, 18),
+"texture": ExtResource("5"),
+"skeleton": 0,
+"bones": PackedInt32Array(6, 7, 0, 0, 6, 7, 0, 0, 6, 7, 0, 0, 6, 7, 0, 0, 6, 7, 0, 0, 6, 7, 0, 0, 6, 7, 0, 0, 6, 7, 0, 0, 6, 7, 0, 0, 6, 7, 0, 0, 6, 7, 0, 0, 6, 7, 0, 0, 6, 7, 0, 0, 6, 7, 0, 0, 6, 7, 0, 0, 6, 7, 0, 0, 6, 7, 0, 0, 6, 7, 0, 0, 6, 7, 0, 0, 6, 7, 0, 0),
+"weights": PackedFloat32Array(1, 0, 0, 0, 1, 0, 0, 0, 0.654545, 0.345455, 0, 0, 0.163636, 0.836364, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0.654545, 0.345455, 0, 0, 0.163636, 0.836364, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0.654545, 0.345455, 0, 0, 0.163636, 0.836364, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0.654545, 0.345455, 0, 0, 0.163636, 0.836364, 0, 0, 0, 1, 0, 0),
+"color": Color(1, 1, 1, 1),
+"z_index": 9
+}
+}]

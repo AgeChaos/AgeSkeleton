@@ -1,0 +1,4 @@
+Import("env")
+Import("env_modules")
+env_agemesh = env_modules.Clone()
+env_agemesh.add_source_files(env.modules_sources, "*.cpp")

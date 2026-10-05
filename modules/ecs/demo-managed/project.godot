@@ -1,0 +1,17 @@
+config_version=5
+[application]
+config/name="AgeChaos ECS - C# Game"
+run/main_loop_type="ECSMainLoop"
+[display]
+window/size/viewport_width=1280
+window/size/viewport_height=720
+[ecs]
+run/scene="res://world.tres"
+game/assembly="ECSExample"
+game/class="Example.Game"
+[leanclr]
+editor/project_builder="res://Build/GameBuild.csproj"
+editor/auto_build=true
+export/file_manifest="res://leanclr/export-files.json"
+[rendering]
+renderer/rendering_method="gl_compatibility"

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="453" height="195" viewBox="-12 -32 151 65">
+<defs><linearGradient id="skin" x1="0" y1="0" x2="0.2" y2="1"><stop stop-color="#a79ce9"/><stop offset="1" stop-color="#5b579c"/></linearGradient>
+<linearGradient id="sail" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffe3ab"/><stop offset="0.55" stop-color="#e9b192"/><stop offset="1" stop-color="#bd8bca"/></linearGradient></defs>
+<g stroke-linejoin="round" stroke-linecap="round">
+<path d="M-6-22Q56-25 130-2Q66 24-6 26Z" fill="url(#skin)"/>
+<path d="M2 13Q56 13 125 0Q65 32 0 24Z" fill="#a6b5df"/>
+<path d="M29-20L47-32L51-17M68-13L83-26L87-9" fill="#dac4ff"/></g></svg>

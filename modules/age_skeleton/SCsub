@@ -1,0 +1,6 @@
+Import("env")
+Import("env_modules")
+
+env_skeleton = env_modules.Clone()
+env_skeleton.Append(CPPPATH=["#modules/ecs"])
+env_skeleton.add_source_files(env.modules_sources, "*.cpp")

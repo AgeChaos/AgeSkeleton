@@ -1,0 +1,11 @@
+config_version=5
+[application]
+config/name="Moonwing — AgeSkeleton"
+run/main_loop_type="ECSMainLoop"
+[display]
+window/size/viewport_width=1480
+window/size/viewport_height=920
+[ecs]
+run/scene="res://Assets/Moonwing.ecsrig.tres"
+[rendering]
+renderer/rendering_method="gl_compatibility"

@@ -1,0 +1,7 @@
+Import("env")
+Import("env_modules")
+
+env_ecs = env_modules.Clone()
+if "age_skeleton" in env.module_list:
+    env_ecs.Append(CPPDEFINES=["AGE_SKELETON_EDITOR"])
+env_ecs.add_source_files(env.modules_sources, "*.cpp")
