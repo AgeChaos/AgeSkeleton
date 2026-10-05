@@ -189,4 +189,61 @@ Error SpriteAtlasBuilder::build(const Ref<SpriteAtlas> &p_atlas, const String &p
 	r_result.sprite_count = entries.size();
 	return OK;
 }
+
+Error SpriteAtlasBuilder::pack_images(const Vector<Ref<Image>> &sources, SpriteAtlasImages &out, int limit, int padding) {
+    out = SpriteAtlasImages();
+    if (limit < 32 || limit > 8192 || (limit & (limit - 1)) || padding < 1 || padding > 32) { out.error="Invalid atlas page size or padding"; return ERR_INVALID_PARAMETER; }
+    struct Entry { int index; Ref<Image> image; Vector2i position; int page; };
+    struct Page { Vector<Rect2i> free; Vector2i used; };
+    Vector<Entry> entries; Vector<Page> pages;
+    for (int i=0; i<sources.size(); ++i) {
+        if(sources[i].is_null() || sources[i]->is_empty()) { out.error="Missing atlas pixels"; return ERR_INVALID_DATA; }
+        Ref<Image> image=sources[i]->duplicate();
+        if(image->is_compressed() && image->decompress()!=OK) { out.error="Cannot decompress atlas source"; return ERR_INVALID_DATA; }
+        image->convert(Image::FORMAT_RGBA8); image->clear_mipmaps();
+        if(image->get_width()+2*padding>limit || image->get_height()+2*padding>limit) { out.error="Image exceeds atlas page including padding"; return ERR_PARAMETER_RANGE_ERROR; }
+        entries.push_back({i,image,Vector2i(),-1});
+    }
+    struct Sort { bool operator()(const Entry &a,const Entry &b) const { int aa=a.image->get_width()*a.image->get_height(),bb=b.image->get_width()*b.image->get_height(); return aa!=bb?aa>bb:a.index<b.index; } };
+    entries.sort_custom<Sort>(); out.regions.resize(entries.size()); out.page_indices.resize(entries.size());
+    for(Entry &entry:entries) {
+        Vector2i size=entry.image->get_size()+Vector2i(padding*2,padding*2);
+        int best_page=-1,best_rect=-1,score=INT_MAX;
+        for(int p=0;p<pages.size();++p) for(int r=0;r<pages[p].free.size();++r) {
+            Vector2i available=pages[p].free[r].size; int waste=MIN(available.x-size.x,available.y-size.y)*8192+MAX(available.x-size.x,available.y-size.y);
+            if(size.x<=available.x && size.y<=available.y && waste<score) { best_page=p;best_rect=r;score=waste; }
+        }
+        if(best_page<0) { Page p;p.free.push_back(Rect2i(0,0,limit,limit));pages.push_back(p);best_page=pages.size()-1;best_rect=0; }
+        Page &page=pages.write[best_page];Rect2i space=page.free[best_rect];Rect2i placed(space.position,size);
+        Vector<Rect2i> remaining;
+        for(const Rect2i &free:page.free) {
+            if(!free.intersects(placed)) {remaining.push_back(free);continue;}
+            if(placed.position.x>free.position.x) remaining.push_back(Rect2i(free.position,Vector2i(placed.position.x-free.position.x,free.size.y)));
+            if(placed.get_end().x<free.get_end().x) remaining.push_back(Rect2i(Vector2i(placed.get_end().x,free.position.y),Vector2i(free.get_end().x-placed.get_end().x,free.size.y)));
+            if(placed.position.y>free.position.y) remaining.push_back(Rect2i(free.position,Vector2i(free.size.x,placed.position.y-free.position.y)));
+            if(placed.get_end().y<free.get_end().y) remaining.push_back(Rect2i(Vector2i(free.position.x,placed.get_end().y),Vector2i(free.size.x,free.get_end().y-placed.get_end().y)));
+        }
+        for(int i=0;i<remaining.size();++i) for(int j=remaining.size()-1;j>=0;--j) {
+            if(i!=j && remaining[i].encloses(remaining[j])) {remaining.remove_at(j);if(j<i)--i;}
+        }
+        page.free=remaining;
+        entry.position=space.position+Vector2i(padding,padding);entry.page=best_page;
+        page.used=page.used.max(space.position+size);
+        out.regions.write[entry.index]=Rect2i(entry.position,entry.image->get_size());out.page_indices.write[entry.index]=best_page;
+    }
+    for(const Page &page:pages) {
+        Ref<Image> image=Image::create_empty(Math::next_power_of_2(uint32_t(page.used.x)),Math::next_power_of_2(uint32_t(page.used.y)),false,Image::FORMAT_RGBA8);
+        image->fill(Color(0,0,0,0));out.pages.push_back(image);
+    }
+    for(const Entry &entry:entries) {
+        Ref<Image> page=out.pages[entry.page];int w=entry.image->get_width(),h=entry.image->get_height();
+        page->blit_rect(entry.image,Rect2i(0,0,w,h),entry.position);
+        // Extrude the complete padding ring, including corners, without filtering neighbours.
+        for(int y=-padding;y<h+padding;++y) for(int x=-padding;x<w+padding;++x) {
+            if(x>=0 && y>=0 && x<w && y<h) continue;
+            page->set_pixel(entry.position.x+x,entry.position.y+y,entry.image->get_pixel(CLAMP(x,0,w-1),CLAMP(y,0,h-1)));
+        }
+    }
+    return OK;
+}
 #endif

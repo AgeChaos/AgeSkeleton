@@ -11,6 +11,7 @@
 #include "scene/gui/check_box.h"
 #include "scene/gui/panel_container.h"
 #include "scene/gui/scroll_container.h"
+#include "scene/gui/scroll_bar.h"
 #include "scene/resources/style_box_flat.h"
 #include "scene/resources/theme.h"
 
@@ -114,19 +115,56 @@ void ECSAnimationEditor::build_canvas_tools() {
 		key->set_tooltip_text(TTR("Insert a keyframe for this transform")); key->set_custom_minimum_size(Size2(30,30)*EDSCALE);
 		key->connect("pressed",callable_mp(this,&ECSAnimationEditor::canvas_tool_action).bind(20+row)); animation_buttons.push_back(key); line->add_child(key);
 	}
-	auto *options=memnew(FoldableContainer); options->set_title(TTR("Canvas Options")); options->set_folded(true); transform_property_host->add_child(options);
-	auto *settings=memnew(VBoxContainer); options->add_child(settings);
+	// Canvas controls belong to the viewport, not the selected bone's inspector.
+	auto *options=memnew(PanelContainer); options->set_name("CanvasOptionsBar");
+	options->set_theme_type_variation("RigToolbarDark"); local_canvas->add_child(options);
+	options->set_anchors_and_offsets_preset(Control::PRESET_CENTER_BOTTOM);
+	auto *bar=memnew(HBoxContainer); options->add_child(bar);
+	Control *zoom_controls=local_canvas->get_zoom_controls(); zoom_controls->reparent(bar);
+	zoom_controls->set_anchors_and_offsets_preset(Control::PRESET_TOP_LEFT);
+	zoom_controls->set_v_size_flags(Control::SIZE_SHRINK_CENTER);
+	auto *scroll=memnew(ScrollContainer); scroll->set_name("CanvasOptionsScroll");
+	scroll->set_h_size_flags(Control::SIZE_EXPAND_FILL); scroll->set_vertical_scroll_mode(ScrollContainer::SCROLL_MODE_DISABLED); bar->add_child(scroll);
+	auto *settings=memnew(HBoxContainer); settings->set_v_size_flags(Control::SIZE_EXPAND_FILL); scroll->add_child(settings);
+	const char *labels[]={"Show Bones","Show Images","Select Bones","Select Images"};
+	for(int i=0;i<4;i++) {
+		auto *check=memnew(CheckBox); check->set_name(String(labels[i]).replace(" ",""));
+		check->set_text(TTR(labels[i])); check->set_tooltip_text(TTR(labels[i])); check->set_pressed(true);
+		check->set_v_size_flags(Control::SIZE_SHRINK_CENTER); settings->add_child(check);
+		check->connect("toggled",callable_mp(local_canvas,&ECSUICanvasEditor::set_authoring_option).bind(i));
+	}
 	auto *axes=memnew(OptionButton); axes->set_tooltip_text(TTR("Transform axes"));
+	axes->set_name("TransformAxes"); axes->set_v_size_flags(Control::SIZE_SHRINK_CENTER);
 	for(const char *name:{"Local","Parent","World"}) { axes->add_item(TTR(name)); } settings->add_child(axes);
 	axes->connect("item_selected",callable_mp(local_canvas,&ECSUICanvasEditor::set_axis_space));
 	for(int i=0;i<2;i++) {
 		auto *check=memnew(CheckBox); compensation_tools[i]=check;
+		check->set_name(i==0?"PreserveBonePoses":"PreserveImagePositions"); check->set_v_size_flags(Control::SIZE_SHRINK_CENTER);
 		check->set_text(i==0?TTR("Preserve child bone poses"):TTR("Preserve image positions")); settings->add_child(check);
 	}
 	local_canvas->set_setup_pose_callback(callable_mp(this,&ECSAnimationEditor::compensated_pose));
-	const char *labels[]={"Show Bones","Show Images","Select Bones","Select Images"};
-	for(int i=0;i<4;i++) { auto *check=memnew(CheckBox); check->set_text(TTR(labels[i])); check->set_pressed(true); settings->add_child(check); check->connect("toggled",callable_mp(local_canvas,&ECSUICanvasEditor::set_authoring_option).bind(i)); }
+	Callable resize_options=callable_mp(this,&ECSAnimationEditor::layout_canvas_options).bind(options,settings);
+	local_canvas->connect("resized",resize_options,CONNECT_DEFERRED);
+	settings->connect("minimum_size_changed",resize_options,CONNECT_DEFERRED);
+	zoom_controls->connect("minimum_size_changed",resize_options,CONNECT_DEFERRED);
+	options->connect("theme_changed",resize_options,CONNECT_DEFERRED);
+	resize_options.call_deferred();
 	canvas_tool_action(1); refresh_canvas_values();
+}
+void ECSAnimationEditor::layout_canvas_options(Control *options, Control *settings) {
+	Size2 zoom_size=local_canvas->get_zoom_controls()->get_combined_minimum_size();
+	Size2 settings_size=settings->get_combined_minimum_size();
+	Size2 margins=options->get_theme_stylebox("panel")->get_minimum_size();
+	float desired_width=margins.x+zoom_size.x+settings->get_theme_constant("separation","HBoxContainer")+settings_size.x;
+	float width=MIN(desired_width,MAX(1.0f,local_canvas->get_size().x-48*EDSCALE));
+	auto *scroll=Object::cast_to<ScrollContainer>(settings->get_parent());
+	float scroll_height=width<desired_width?scroll->get_h_scroll_bar()->get_combined_minimum_size().y:0;
+	float height=margins.y+MAX(zoom_size.y,settings_size.y+scroll_height);
+	// Pixel-aligned, content-sized and centered in the canvas; only narrow views scroll.
+	options->set_offset(SIDE_LEFT,-Math::floor(width*.5f));
+	options->set_offset(SIDE_RIGHT,Math::ceil(width*.5f));
+	options->set_offset(SIDE_TOP,-24*EDSCALE-height);
+	options->set_offset(SIDE_BOTTOM,-24*EDSCALE);
 }
 void ECSAnimationEditor::canvas_tool_action(int tool) {
 	if(tool==13) { canvas_values[5]->get_line_edit()->grab_focus(); return; }

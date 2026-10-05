@@ -1,0 +1,21 @@
+// SPDX-License-Identifier: LicenseRef-AgeSkeleton-Free-RestrictedCommercial-1.0
+const assert=require('assert'),fs=require('fs');
+const {Player}=require(process.argv[2]);
+const data=JSON.parse(fs.readFileSync(process.argv[3],'utf8')),p=new Player(data);
+const events=expected=>assert.strictEqual(p.events.map(e=>e.name+',').join(''),expected);
+const rest=Array.from(p.positions);
+p.setIKTarget('Tip',1,1,2,1,64,.0001);assert(Math.hypot(p.getBoneTip('Tip')[0]-1,p.getBoneTip('Tip')[1]-1)<.001);
+assert(Math.hypot(p.positions[0]-1,p.positions[1]-1)<.001);
+p.clearIKTarget('Tip');assert.deepStrictEqual(Array.from(p.positions),rest);
+p.setIKTarget('Tip',1,1,2,0);assert.deepStrictEqual(Array.from(p.positions),rest);
+p.setIKTarget('Tip',1,1,2,.5);assert(p.positions[0]>1.1&&p.positions[1]>.1&&p.positions[1]<.99);
+const before=Array.from(p.positions);assert.throws(()=>p.setIKTarget('Tip',NaN,1));assert.throws(()=>p.setIKTarget('Tip',1,1,3));assert.deepStrictEqual(Array.from(p.positions),before);
+p.setIKTarget('Tip',100,100,2,1,64,.001);assert(Array.from(p.positions).every(Number.isFinite));p.clearIKTarget('Tip');
+p.play('Loop');p.update(0);events('');p.update(.25);events('start,quarter,');assert.strictEqual(p.events[0].intValue,-2147483648);assert.strictEqual(p.events[0].stringValue,'测试 event');
+p.update(.75);events('late,start,end,');p.update(0);events('');p.seek(.5);p.speed=-1;p.update(.75);events('quarter,end,start,late,');
+p.seek(0);p.speed=1;p.update(2.25);events('quarter,late,start,end,quarter,late,start,end,quarter,');
+p.playing=false;p.update(1);events('');p.playing=true;p.speed=0;p.update(1);events('');p.speed=1;p.seek(0);assert.throws(()=>p.update(2000));assert.strictEqual(p.time,0);events('');
+p.play('Once');p.update(2);events('start,quarter,late,end,');assert(!p.playing&&p.time===1);p.stop();events('');
+const bad=JSON.parse(JSON.stringify(data));bad.rig.parents[0]=1;assert.throws(()=>new Player(bad));
+const legacy=JSON.parse(JSON.stringify(data));legacy.version=1;delete legacy.rig;const old=new Player(legacy);old.play('Loop');old.update(.25);assert.strictEqual(old.events.length,0);assert.throws(()=>old.setIKTarget('Tip',1,1));
+console.log('AGESKELETON_MOTION_TS_PASS weighted_ik mix clear invalid events loops reverse pause seek payload legacy');

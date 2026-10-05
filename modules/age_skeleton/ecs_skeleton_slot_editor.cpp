@@ -171,6 +171,7 @@ void ECSAnimationEditor::refresh_slot_tools() {
 	skin_choice->clear();slot_choice->clear();attachment_choice->clear(); skin_layers->clear(); skin_attachment_target->clear();
 	int rig=find_rig(target->get_selected_id());
 	Dictionary definition=rig<0?Dictionary():Dictionary(Dictionary(scene->get_entities()[rig]).get("skeleton_2d",Dictionary()));
+	refresh_wardrobe_tools(rig,definition);
 	Dictionary skins=definition.get("skins",Dictionary());String active=definition.get("skin",String("default"));
 	PackedStringArray stack=definition.get("active_skins",PackedStringArray());
     PackedStringArray layer_names=stack; for(const Variant &name:skins.keys()) { if(!layer_names.has(name)) { layer_names.push_back(name); } }
@@ -192,6 +193,54 @@ void ECSAnimationEditor::refresh_slot_tools() {
 	}
 	slot_tint->set_disabled(selected<0);slot_order->set_editable(selected>=0);slot_blend->set_disabled(selected<0);
 	refreshing_slots=false;
+}
+
+void ECSAnimationEditor::refresh_wardrobe_tools(int rig, const Dictionary &definition) {
+	if(!wardrobe_tools) { return; }
+	for(int i=wardrobe_tools->get_child_count()-1;i>=0;i--) { Node *child=wardrobe_tools->get_child(i); wardrobe_tools->remove_child(child); child->queue_free(); }
+	Dictionary skins=definition.get("skins",Dictionary()),groups;
+	// Skin folders express mutually exclusive parts without introducing runtime data.
+	for(const Variant &key:skins.keys()) {
+		String name=key; int slash=name.find("/"); if(slash<=0 || slash==name.length()-1) { continue; }
+		String group=name.substr(0,slash); PackedStringArray names=groups.get(group,PackedStringArray()); names.push_back(name); groups[group]=names;
+	}
+	Object::cast_to<Control>(wardrobe_tools->get_parent())->set_visible(!groups.is_empty());
+	PackedStringArray active=definition.get("active_skins",PackedStringArray());
+	if(active.is_empty()) { active.push_back(definition.get("skin",String("default"))); }
+	for(const Variant &key:groups.keys()) {
+		String group=key; PackedStringArray names=groups[group]; names.insert(0,String());
+		auto *row=memnew(HBoxContainer); wardrobe_tools->add_child(row);
+		auto *label=memnew(Label); label->set_text(TTR(group)); label->set_custom_minimum_size(Size2(70,0)*EDSCALE); row->add_child(label);
+		auto *choice=memnew(OptionButton); choice->set_name(group.validate_node_name()); choice->set_h_size_flags(SIZE_EXPAND_FILL); choice->set_fit_to_longest_item(false); row->add_child(choice);
+		choice->set_tooltip_text(TTR("Choose one skin per part. Other parts and the current animation are preserved."));
+		choice->add_item(TTR("Default"));
+		for(int i=1;i<names.size();i++) { choice->add_item(TTR(names[i].substr(group.length()+1))); }
+		for(const String &name:active) { int index=names.find(name); if(index>0) { choice->select(index); } }
+		choice->connect("item_selected",callable_mp(this,&ECSAnimationEditor::wardrobe_selected).bind(rig,group,names));
+	}
+}
+
+void ECSAnimationEditor::wardrobe_selected(int index, int rig, const String &group, const PackedStringArray &names) {
+	if(index>=0 && index<names.size()) { apply_wardrobe_skin(rig,group,names[index]); }
+}
+
+bool ECSAnimationEditor::apply_wardrobe_skin(int rig, const String &group, const String &skin) {
+	if(scene.is_null() || rig<0 || rig>=scene->get_entities().size() || group.is_empty() || group.contains("/")) { return false; }
+	Array entities=scene->get_entities().duplicate(true); Dictionary root=entities[rig],definition=root.get("skeleton_2d",Dictionary());
+	Dictionary skins=definition.get("skins",Dictionary()); String prefix=group+"/"; bool found=false;
+	for(const Variant &name:skins.keys()) { if(String(name).begins_with(prefix) && String(name).length()>prefix.length()) { found=true; } }
+	if(!found || (!skin.is_empty() && (!skin.begins_with(prefix) || !skins.has(skin)))) { return false; }
+	PackedStringArray active=definition.get("active_skins",PackedStringArray()),next;
+	if(active.is_empty()) { String current=definition.get("skin",String("default")); if(current!="default") { active.push_back(current); } }
+	for(const String &name:active) { if(!name.begins_with(prefix)) { next.push_back(name); } }
+	if(!skin.is_empty()) { next.push_back(skin); }
+	if(!skins.has("default")) { skins["default"]=Dictionary(); }
+	definition["skins"]=skins; definition["skin"]="default"; definition["active_skins"]=next;
+	root["skeleton_2d"]=definition;
+	if(entities==scene->get_entities()) { return true; }
+	Ref<ECSScene> check; check.instantiate(); check->set_entities(entities); if(check->instantiate().is_null()) { return false; }
+	// edit_scene reapplies the current playhead and keeps playback running.
+	commit_entities(entities,TTR("Change outfit part")); return true;
 }
 
 void ECSAnimationEditor::slot_action(int action) {

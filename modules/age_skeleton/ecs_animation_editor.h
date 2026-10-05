@@ -6,6 +6,7 @@
 #include "scene/gui/option_button.h"
 #include "scene/gui/spin_box.h"
 #include "scene/gui/tree.h"
+#include "scene/gui/tab_bar.h"
 #include "scene/gui/line_edit.h"
 #include "scene/gui/label.h"
 class SkeletonWorkspaceDocking;
@@ -38,6 +39,12 @@ class ECSAnimationEditor : public VBoxContainer {
     void preference_directory_chosen(const String &path);
     Control *preference_pages[5]={};
     ItemList *preference_categories=nullptr,*export_formats=nullptr;
+    TabBar *export_engine_tabs=nullptr;
+    Button *export_preview_button=nullptr;
+    int selected_export_format() const;
+    void export_engine_changed(int p_engine);
+    int export_engine_index=0;
+    String export_engine_paths[5];
     LineEdit *export_path=nullptr;
     SpinBox *export_scale=nullptr,*export_quality=nullptr;
     CheckBox *export_crop=nullptr,*export_alpha=nullptr,*export_open=nullptr;
@@ -99,9 +106,14 @@ class ECSAnimationEditor : public VBoxContainer {
 	ItemList *animation_list=nullptr;
 	Control *animation_property_panel=nullptr,*setup_property_panel=nullptr;
 	void build_canvas_tools();
+	void layout_canvas_options(Control *p_options, Control *p_settings);
 	VBoxContainer *canvas_tool_host=nullptr,*transform_property_host=nullptr;
 	void build_slot_tools(BoxContainer *p_parent);
 	void refresh_slot_tools();
+	VBoxContainer *wardrobe_tools=nullptr;
+	void refresh_wardrobe_tools(int p_rig, const Dictionary &p_definition);
+	void wardrobe_selected(int p_index, int p_rig, const String &p_group, const PackedStringArray &p_names);
+	bool apply_wardrobe_skin(int p_rig, const String &p_group, const String &p_skin);
 	void build_slot_hierarchy(const Array &p_entities, const Vector<TreeItem *> &p_rows);
 	void slot_action(int p_action);
 	ItemList *skin_layers=nullptr;
@@ -201,6 +213,7 @@ class ECSAnimationEditor : public VBoxContainer {
 	void set_mode(int p_mode);
 	void toggle_authoring_mode();
 	void hierarchy_selected();
+	void hierarchy_activated();
 	void choose_animation(int p_index);
 	void seek(double p_time);
 	void select_key(int p_track,int p_key);

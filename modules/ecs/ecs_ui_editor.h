@@ -97,6 +97,7 @@ public:
 	void preview_authoring_vector(int p_index,const String &p_field,const Vector3 &p_value) { if(preview.is_valid() && p_index>=0 && p_index<ids.size()) { preview->set_vector(ids[p_index],p_field,p_value); sync_authoring_preview(); queue_redraw(); } }
 	Vector3 get_authoring_vector(int p_index,const String &p_field) const { return preview.is_valid() && p_index>=0 && p_index<ids.size()?preview->get_vector(ids[p_index],p_field):Vector3(); }
 	void set_skeleton_authoring(bool p_enabled);
+	Control *get_zoom_controls() const { return zoom_bar_control; }
 	void set_authoring_tool(int p_tool) { set_tool(p_tool); }
 	void set_axis_space(int p_space) { finish_drag(false); axis_space=p_space; queue_redraw(); }
 	void set_authoring_option(bool p_enabled,int p_option);
@@ -115,6 +116,7 @@ public:
 	void drop_data(const Point2 &p_point,const Variant &p_data) override;
 	void gui_input(const Ref<InputEvent> &p_event) override;
 	Rect2 get_selected_rect();
+	bool frame_selected_attachment();
 	bool run_self_test();
 	bool run_tilemap_self_test(const Ref<ECSScene> &p_scene);
 	bool run_mesh_edit_self_test(const Ref<ECSScene> &p_scene);

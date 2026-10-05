@@ -3,6 +3,7 @@
 #include "ecs_animation_editor.h"
 #include "ecs_ai_value.h"
 #include "ecs_spine_import.h"
+#include "skeleton_runtime_export.h"
 #include "core/config/project_settings.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
@@ -100,8 +101,10 @@ Dictionary ECSAnimationEditor::skeleton_ai_request(const Dictionary &request) {
     }
     Array entities=scene.is_valid()?scene->get_entities():Array();
     if(op=="capabilities") {
-        reply["operations"]=PackedStringArray({"status","inspect","new","open","import_spine","add_bone","add_image","pose","bind","subdivide","paint_weights","rename","patch","component","tracks","edit_key","animation_manage","view","validate","export_presets","export","ui_tree","ui_action","skin","slot","animation","key","preview","events","save","screenshot","undo","redo"});
+        reply["operations"]=PackedStringArray({"status","inspect","new","open","import_spine","add_bone","add_image","pose","bind","subdivide","paint_weights","rename","patch","component","tracks","edit_key","animation_manage","view","validate","export_presets","export","export_runtime","ui_tree","ui_action","skin","slot","wardrobe","animation","key","preview","events","save","screenshot","undo","redo"});
         Dictionary parameters;
+        parameters["export_runtime"]="entity:skeleton index, directory:new output directory, fps:1..120 (default 30); sampled portable mesh clips";
+        parameters["wardrobe"]="entity:skeleton index, group:skin folder, skin:full group/variant name; empty skin restores the default part";
         parameters["rename"]="entity:int, kind:bone|slot|skin, name:string, old_name:string (slot/skin)";
         parameters["paint_weights"]="entity:int, strokes:[{bone:entity index,center:Vector2,radius:positive number,strength:-1..1}]";
         parameters["component"]="entity:int, component:bone_2d|skeleton_2d|polygon_2d, fields:typed dictionary (merged)";
@@ -131,6 +134,7 @@ Dictionary ECSAnimationEditor::skeleton_ai_request(const Dictionary &request) {
             if(SpinBox *spin=Object::cast_to<SpinBox>(control)) { item["value"]=spin->get_value(); item["min"]=spin->get_min(); item["max"]=spin->get_max(); }
             if(OptionButton *choice=Object::cast_to<OptionButton>(control)) { Array options; for(int i=0;i<choice->get_item_count();i++) { options.push_back(choice->get_item_text(i)); } item["items"]=options; item["selected"]=choice->get_selected(); }
             if(ItemList *list=Object::cast_to<ItemList>(control)) { Array entries; for(int i=0;i<list->get_item_count();i++) { Dictionary entry; entry["index"]=i; entry["text"]=list->get_item_text(i); entry["selected"]=list->is_selected(i); entries.push_back(entry); } item["items"]=entries; }
+            if(TabBar *tabs=Object::cast_to<TabBar>(control)) { Array entries; for(int i=0;i<tabs->get_tab_count();i++) entries.push_back(tabs->get_tab_title(i));item["items"]=entries;item["selected"]=tabs->get_current_tab(); }
             if(TabContainer *tabs=Object::cast_to<TabContainer>(control)) { Array entries; for(int i=0;i<tabs->get_tab_count();i++) { entries.push_back(tabs->get_tab_title(i)); } item["items"]=entries; item["selected"]=tabs->get_current_tab(); }
             if(Tree *tree=Object::cast_to<Tree>(control)) { Array rows; Vector<TreeItem *> todo; if(tree->get_root()) { todo.push_back(tree->get_root()); } while(!todo.is_empty() && rows.size()<1024) { TreeItem *row=todo[0]; todo.remove_at(0); Dictionary entry; entry["index"]=rows.size(); entry["text"]=row->get_text(0); entry["selected"]=row->is_selected(0); entry["collapsed"]=row->is_collapsed(); rows.push_back(entry); for(TreeItem *child=row->get_first_child();child;child=child->get_next()) { todo.push_back(child); } } item["items"]=rows; }
             controls.push_back(item);
@@ -235,6 +239,7 @@ Dictionary ECSAnimationEditor::skeleton_ai_request(const Dictionary &request) {
         Viewport *capture=get_viewport();
         if(!target.is_empty()) {
             Window *dialog=target=="settings"?preferences_dialog:target=="export"?asset_export_dialog:target=="export_preview"?export_preview_dialog:nullptr;
+            if(target=="tooltip") { for(int i=0;i<hierarchy->get_child_count();++i) { Window *window=Object::cast_to<Window>(hierarchy->get_child(i));if(window && window->is_visible()) { dialog=window;break; } } }
             if(!dialog || !dialog->is_visible()) { return finish(false,"Requested dialog is not visible"); }
             capture=dialog;
         }
@@ -274,13 +279,22 @@ Dictionary ECSAnimationEditor::skeleton_ai_request(const Dictionary &request) {
                 line->set_text(text); line->emit_signal("text_changed",String(text)); if(bool(request.get("submit",false))) { line->emit_signal("text_submitted",String(text)); }
             } else if(command=="number") {
                 SpinBox *spin=Object::cast_to<SpinBox>(control); Variant value=request.get("value",Variant()); if(!spin || !spin->is_editable() || (value.get_type()!=Variant::INT && value.get_type()!=Variant::FLOAT) || !Math::is_finite(double(value)) || double(value)<spin->get_min() || double(value)>spin->get_max()) { return finish(false,"Expected editable number within bounds"); } spin->set_value(value);
-            } else if(command=="item_select" || command=="collapse" || command=="tree_button" || command=="click_item") {
+            } else if(command=="item_select" || command=="collapse" || command=="tree_button" || command=="click_item" || command=="hover_item" || command=="activate_item") {
                 Variant index=request.get("index",-1); if((index.get_type()!=Variant::INT && index.get_type()!=Variant::FLOAT) || !Math::is_finite(double(index)) || double(index)!=Math::floor(double(index)) || double(index)<0 || double(index)>100000) { return finish(false,"Invalid item index"); }
                 if(Tree *tree=Object::cast_to<Tree>(control)) {
                     Vector<TreeItem *> todo; if(tree->get_root()) { todo.push_back(tree->get_root()); } TreeItem *selected=nullptr; int current=0;
                     while(!todo.is_empty() && current<=int(index)) { TreeItem *row=todo[0]; todo.remove_at(0); if(current++==int(index)) { selected=row; break; } for(TreeItem *child=row->get_first_child();child;child=child->get_next()) { todo.push_back(child); } }
                     if(!selected) { return finish(false,"Tree item no longer exists"); }
-                    if(command=="click_item") {
+                    if(command=="hover_item") {
+                        for(TreeItem *parent=selected->get_parent();parent;parent=parent->get_parent()) { parent->set_collapsed(false); }
+                        tree->scroll_to_item(selected,true);
+                        Rect2 rect=tree->get_item_rect(selected,0); Vector2 point=rect.get_center();
+                        Ref<InputEventMouseMotion> event;event.instantiate();event->set_position(tree->get_global_transform_with_canvas().xform(point));event->set_global_position(event->get_position());
+                        tree->get_viewport()->warp_mouse(event->get_position());
+                        tree->get_viewport()->push_input(event,true);tree->get_viewport()->show_tooltip(tree); reply["tooltip"]=tree->get_tooltip(point); reply["point"]=ECSAIValue::encode(point);
+                    } else if(command=="activate_item") {
+                        selected->select(0); tree->emit_signal("item_activated");
+                    } else if(command=="click_item") {
                         for(TreeItem *parent=selected->get_parent();parent;parent=parent->get_parent()) { parent->set_collapsed(false); }
                         tree->scroll_to_item(selected,true);
                         Rect2 rect=tree->get_item_rect(selected,0);
@@ -296,6 +310,7 @@ Dictionary ECSAnimationEditor::skeleton_ai_request(const Dictionary &request) {
                     else { if(!selected->is_selectable(0)) { return finish(false,"Tree item is not selectable"); } selected->select(0); tree->emit_signal("item_selected"); }
                 } else if(command=="item_select") {
                     if(ItemList *list=Object::cast_to<ItemList>(control)) { if(int(index)>=list->get_item_count() || list->is_item_disabled(index) || !list->is_item_selectable(index)) { return finish(false,"Item unavailable"); } list->select(index); list->emit_signal("item_selected",int(index)); }
+                    else if(TabBar *tabs=Object::cast_to<TabBar>(control)) { if(int(index)>=tabs->get_tab_count() || tabs->is_tab_disabled(index) || tabs->is_tab_hidden(index)) return finish(false,"Tab unavailable");tabs->set_current_tab(index); }
                     else if(TabContainer *tabs=Object::cast_to<TabContainer>(control)) { if(int(index)>=tabs->get_tab_count() || tabs->is_tab_disabled(index) || tabs->is_tab_hidden(index)) { return finish(false,"Tab unavailable"); } tabs->set_current_tab(index); }
                     else { return finish(false,"Expected Tree, ItemList or TabContainer"); }
                 } else { return finish(false,"Expected Tree"); }
@@ -309,6 +324,21 @@ Dictionary ECSAnimationEditor::skeleton_ai_request(const Dictionary &request) {
         String mode=request.get("mode",animation_mode?"animation":"setup"); if(mode!="animation" && mode!="setup") { return finish(false,"Expected setup or animation mode"); }
         if(request.has("grid") && request["grid"].get_type()!=Variant::BOOL) { return finish(false,"Expected boolean grid"); }
         set_mode(mode=="animation"?1:0); if(request.has("grid")) { local_canvas->set_grid_visible(request["grid"]); } ++skeleton_ai_revision; return finish(true);
+    }
+    if(op=="export_runtime") {
+        Variant rate=request.get("fps",30);
+        if((rate.get_type()!=Variant::INT && rate.get_type()!=Variant::FLOAT) || !Math::is_finite(double(rate)) || double(rate)!=Math::floor(double(rate)) || double(rate)<1 || double(rate)>120) { return finish(false,"Expected integer fps 1..120"); }
+        reply=export_skeleton_runtime(scene,request.get("entity",0),request.get("directory",String()),int(rate));
+        return finish(reply.get("ok",false),reply.get("error",String()));
+    }
+    if(op=="wardrobe") {
+        int rig=request.get("entity",-1); String group=request.get("group",String()),skin=request.get("skin",String());
+        if(!apply_wardrobe_skin(rig,group,skin)) { return finish(false,"Expected an existing skin group and matching group/skin name; empty skin restores the default part"); }
+        Dictionary definition=Dictionary(scene->get_entities()[rig])["skeleton_2d"]; reply["active_skins"]=definition.get("active_skins",PackedStringArray());
+        Ref<ECSWorld> world=scene->instantiate(); PackedInt64Array ids=world->query(PackedStringArray(),true); Array visible;
+        for(int i=0;i<ids.size();i++) { if(Dictionary(scene->get_entities()[i]).has("polygon_2d") && world->is_skeleton_attachment_visible(ids[i])) { visible.push_back(i); } }
+        reply["visible_attachments"]=visible;
+        return finish(true);
     }
     if(op=="component") {
         int index=request.get("entity",-1); String component=request.get("component",String()); bool valid=true;

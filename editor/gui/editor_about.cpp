@@ -57,7 +57,7 @@ void EditorAbout::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_TRANSLATION_CHANGED: {
 			_about_text_label->set_text(
-					TTR("AgeSkeleton — MIT License\nBased on Godot; an independent distribution.\n") +
+					TTR("AgeSkeleton — Free use, private development\nBased on Godot; an independent distribution.\n") +
 					String(U"© 2014-present ") + TTR("Godot Engine contributors") + ".\n" +
 					String(U"© 2007-2014 Juan Linietsky, Ariel Manzur.\n"));
 
@@ -307,7 +307,7 @@ EditorAbout::EditorAbout() {
 	license_thirdparty->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	tc->add_child(license_thirdparty);
 
-	Label *tpl_label = memnew(Label(TTRC("AgeSkeleton is available under the MIT license. Godot and other third-party components retain their original copyrights and licenses.")));
+	Label *tpl_label = memnew(Label(TTRC("AgeSkeleton allows private modification and internal use; external commercialization is prohibited, with or without source disclosure. Godot and third-party components retain their own licenses.")));
 	tpl_label->set_focus_mode(Control::FOCUS_ACCESSIBILITY);
 	tpl_label->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	tpl_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);

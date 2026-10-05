@@ -1,5 +1,6 @@
 #ifdef TOOLS_ENABLED
 #include "ecs_animation_editor.h"
+#include "skeleton_attachment_tree.h"
 #include "core/object/callable_mp.h"
 #include "ecs_skeleton_icons.h"
 #include "editor/editor_node.h"
@@ -212,6 +213,17 @@ bool ECSAnimationEditor::run_workspace_tools_self_test() {
 
     skin_name_edit->set_text("empty");slot_action(12);authored=Dictionary(scene->get_entities()[0])["skeleton_2d"];ok &= Dictionary(authored["skins"]).has("empty");
     skin_name_edit->set_text("renamed");slot_action(13);slot_action(2);authored=Dictionary(scene->get_entities()[0])["skeleton_2d"];ok &= !Dictionary(authored["skins"]).has("renamed");ok &= undo->undo();edit_scene(skins_test,nullptr);authored=Dictionary(scene->get_entities()[0])["skeleton_2d"];ok &= Dictionary(authored["skins"]).has("renamed");
+    // Preview and frame a non-active skin attachment without changing its visibility or resource.
+    Array before_preview=scene->get_entities().duplicate(true);
+    select_target(2);
+    ok &= local_canvas->frame_selected_attachment();
+    Control *swatch=static_cast<SkeletonAttachmentTree *>(hierarchy)->make_attachment_preview(2);
+    ok &= swatch!=nullptr;
+    if(swatch) { memdelete(swatch); }
+    ok &= static_cast<SkeletonAttachmentTree *>(hierarchy)->make_attachment_preview(-1)==nullptr;
+    ok &= static_cast<SkeletonAttachmentTree *>(hierarchy)->make_attachment_preview(1)==nullptr;
+    ok &= scene->get_entities()==before_preview;
+    if(ok) { print_line("SKELETON_ATTACHMENT_PREVIEW_PASS hidden_variant_frame missing_texture non_attachment_no_preview scene_unchanged"); }
     edit_scene(saved,nullptr); set_mode(was_animation?1:0);
     if(ok) { print_line("SKELETON_WORKSPACE_TOOLS_PASS drag_create click_no_create escape_cancel undo filter find_replace regex_error"); }
     return ok;

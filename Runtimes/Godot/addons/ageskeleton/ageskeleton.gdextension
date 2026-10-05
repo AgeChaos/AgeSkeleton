@@ -1,0 +1,9 @@
+[configuration]
+entry_symbol = "ageskeleton_library_init"
+compatibility_minimum = "4.4"
+reloadable = false
+
+[libraries]
+windows.x86_64 = "res://addons/ageskeleton/bin/ageskeleton_godot.dll"
+linux.x86_64 = "res://addons/ageskeleton/bin/ageskeleton_godot.so"
+macos = "res://addons/ageskeleton/bin/ageskeleton_godot.dylib"

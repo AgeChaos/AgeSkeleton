@@ -35,11 +35,13 @@ void ECSSkeletonEditorPlugin::open_workspace() {
 }
 void ECSSkeletonEditorPlugin::request_close() { close_dialog->popup_centered(); }
 bool skeleton_image_codec_self_test();
+bool skeleton_runtime_atlas_self_test();
 void ECSSkeletonEditorPlugin::self_test() {
 	bool ok=skeleton_image_codec_self_test();
 	ok &= ECSWorld::skeleton_slots_self_test();
 	ok &= ECSWorld::skeleton_animation_channels_self_test();
 	ok &= workspace->run_self_test();
+	ok &= skeleton_runtime_atlas_self_test();
 	ok &= workspace->prepare_platform_export();
 	bool windows=false,linux=false,mac=false,web=false;
 	for(int i=0;i<EditorExport::get_singleton()->get_export_platform_count();i++) {

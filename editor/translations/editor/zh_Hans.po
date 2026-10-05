@@ -22290,11 +22290,11 @@ msgstr "搜索组件…"
 msgid "No matching components"
 msgstr "没有匹配的组件"
 
-msgid "AgeSkeleton is available under the MIT license. Godot and other third-party components retain their original copyrights and licenses."
-msgstr "AgeSkeleton 采用 MIT 许可证。Godot 及其他第三方组件保留各自的版权和许可证。"
+msgid "AgeSkeleton allows private modification and internal use; external commercialization is prohibited, with or without source disclosure. Godot and third-party components retain their own licenses."
+msgstr "AgeSkeleton 允许自行修改和内部使用；无论是否开源，均禁止对外商用。Godot 及第三方组件保留各自许可证。"
 
-msgid "AgeSkeleton — MIT License\nBased on Godot; an independent distribution.\n"
-msgstr "AgeSkeleton — MIT 许可证\n基于 Godot 的独立发行版。\n"
+msgid "AgeSkeleton — Free use, private development\nBased on Godot; an independent distribution.\n"
+msgstr "AgeSkeleton — 免费使用，允许自行开发\n基于 Godot 的独立发行版。\n"
 
 msgid "Rig"
 msgstr "骨架"
@@ -22385,3 +22385,99 @@ msgstr "最大化面板"
 
 msgid "Restore Panel"
 msgstr "还原面板"
+
+msgid "Wardrobe"
+msgstr "换装"
+
+msgid "Tops"
+msgstr "上衣"
+
+msgid "Bottoms"
+msgstr "裤装"
+
+msgid "Headwear"
+msgstr "头饰"
+
+msgid "Weapons"
+msgstr "武器"
+
+msgid "Scout Tunic"
+msgstr "游侠短衣"
+
+msgid "Travel Jacket"
+msgstr "旅行夹克"
+
+msgid "Steel Armor"
+msgstr "钢制护甲"
+
+msgid "Canvas Trousers"
+msgstr "帆布长裤"
+
+msgid "Ranger Boots"
+msgstr "游侠长靴"
+
+msgid "Feather Cap"
+msgstr "羽饰帽"
+
+msgid "Knight Helm"
+msgstr "骑士头盔"
+
+msgid "Short Sword"
+msgstr "短剑"
+
+msgid "Oak Staff"
+msgstr "橡木法杖"
+
+msgid "Change outfit part"
+msgstr "更换服装部位"
+
+msgid "Choose one skin per part. Other parts and the current animation are preserved."
+msgstr "每个部位选择一种皮肤，保留其他部位搭配及当前动画。"
+
+msgid "Double-click to frame attachment"
+msgstr "双击定位此附件"
+
+msgid "No texture assigned"
+msgstr "未设置图片"
+
+msgid "Portable runtime"
+msgstr "通用运行库"
+
+msgid "New runtime package folder"
+msgstr "新建运行库资源目录"
+
+msgid "Unity / Unreal / Cocos / Godot: JSON and PNG pages, all clips and skins. Mesh deformation is sampled at the export frame rate; runtime IK and events are not included. Use a new folder."
+msgstr "Unity / Unreal / Cocos / Godot：导出全部动画、皮肤及 JSON、PNG。网格按导出帧率采样，不包含运行时 IK 和事件。请选择新的目录。"
+
+msgid "Preview this package in the target engine using its AgeSkeleton runtime."
+msgstr "请在目标引擎中使用 AgeSkeleton 运行库预览此资源。"
+
+msgid "Runtime package exported"
+msgstr "运行库资源已导出"
+
+msgid "Runtime export failed"
+msgstr "运行库导出失败"
+
+msgid "Atlas export failed"
+msgstr "图集导出失败"
+
+msgid "Engine runtime"
+msgstr "引擎运行库"
+
+msgid "Unity 2022.3 / 6: import atlas textures with the UPM runtime, or use Unity Sprite Atlas."
+msgstr "Unity 2022.3 / 6：使用 UPM 运行库导入图集纹理，也可接入 Unity Sprite Atlas。"
+
+msgid "Unreal Engine 5: import Texture2D pages and use the C++ plugin with a translucent material."
+msgstr "Unreal Engine 5：导入 Texture2D 图集，使用 C++ 插件与半透明材质。"
+
+msgid "Cocos Creator 3.8: use the TypeScript component with textures or a native SpriteAtlas (no trim or rotation)."
+msgstr "Cocos Creator 3.8：使用 TypeScript 组件，绑定图集纹理或原生 SpriteAtlas（关闭裁剪与旋转）。"
+
+msgid "Godot 4.4+: use the C++ GDExtension and imported atlas textures."
+msgstr "Godot 4.4+：使用 C++ GDExtension 与导入的图集纹理。"
+
+msgid "Exports all clips and skins with PNG atlases, runtime IK targets and animation events. Animation crossfades are not included. Choose a new folder."
+msgstr "导出全部动画、皮肤及 PNG 图集，支持运行时 IK 目标与动画事件。暂不支持动画混合过渡。请选择新目录。"
+
+msgid "Native support"
+msgstr "原生支持"

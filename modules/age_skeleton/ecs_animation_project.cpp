@@ -1,3 +1,4 @@
+#include "skeleton_runtime_export.h"
 #include "modules/ecs/ecs_compact_skeleton.h"
 #ifdef TOOLS_ENABLED
 #include "ecs_animation_editor.h"
@@ -70,6 +71,7 @@ void ECSAnimationEditor::project_file_selected(const String &path) {
 		String error;
 		if(path.get_extension().to_lower()!="res") { feedback->set_text(String(U"骨骼资源请使用 .res 扩展名。")); return; }
 		Ref<ECSScene> exported; exported.instantiate(); Array entities=scene->get_entities().duplicate(true);
+        if(!pack_skeleton_atlas_entities(entities,error)) { feedback->set_text(TTR("Atlas export failed")+": "+error); return; }
         Array packed=ecs_pack_skeleton_entities(entities);
         if(packed.is_empty()) {feedback->set_text(String(U"骨骼资源包含不支持的游戏组件，未导出。"));return;}
         Ref<ECSCompactSkeleton> check;check.instantiate();

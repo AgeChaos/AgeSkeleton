@@ -6,7 +6,7 @@
 
 A standalone **2D skeletal animation editor** built on Godot, with rigging, skinning, weight painting, keyframe animation and resource export.
 
-无需账号登录或在线授权。原创代码及图标采用 MIT 许可证，第三方组件保留各自许可证。
+无需账号登录或在线授权。原创编辑器与运行库代码、图标采用免费使用与限制商业化许可，允许自行修改与内部使用；禁止对外商业发行、服务及商业产品集成，无论是否开源；第三方组件保留各自许可证。
 
 ## 功能 / Features
 
@@ -43,6 +43,126 @@ python tools/package_release.py --output ../AgeSkeletonData/Exports/AgeSkeleton-
 ```
 
 The package includes a SHA-256 inventory and opens Moonwing by default. Packaging does not change a development build into an optimized release build.
+
+## 多部位换装 / Outfit composition
+
+原创 **Wayfarer（旅人）** 示例包含 11 根骨骼、23 个蒙皮附件，以及 Idle／Walk 动画：
+
+```powershell
+python tools/open_editor.py --project samples/wardrobe
+```
+
+选中角色或其骨骼，在右侧属性的 **换装** 区域选择上衣、裤装、头饰和武器。各部位独立组合；更换上衣会同时替换身体与两只袖子。选择“默认”恢复基础服装，头饰和武器则卸下。换装支持撤销、重做、保存，并保留动画播放状态。
+
+Select the character or a bone, then use **Wardrobe** in the inspector to combine tops, bottoms, headwear and weapons. Changing a top replaces its body and both sleeves together. **Default** restores the base outfit or removes headwear/weapons. Changes support undo, redo and saving without interrupting animation playback.
+
+制作自己的服装时，使用 `分组/款式` 命名皮肤，例如 `Tops/Scout Tunic`。同一分组代表互斥选项，不同分组可以组合；一套皮肤可以为多个插槽的同名占位符提供附件。各套附件需要绑定到共用骨架。换装复用现有 `active_skins` 皮肤组合数据，无需复制骨架或动画。旧工程没有分组皮肤时，不显示此区域。
+
+Name skins `Group/Variant` to define parts. Each group selects one variant; a variant can supply attachments for several slot placeholders. Bind replacement meshes to the shared rig. Composition uses the existing `active_skins` data. The panel appears only when grouped skins exist.
+
+本地 AI 接口也支持换装；空 `skin` 恢复该部位默认值 / Local AI operation (an empty `skin` restores the default part):
+
+```json
+{"operation":"wardrobe","entity":0,"group":"Tops","skin":"Tops/Steel Armor"}
+```
+
+示例由 `tools/generate_wardrobe.py` 生成，素材与骨架采用 MIT；来源见 `samples/wardrobe/provenance.json`。当前发行打包清单仍只包含 Moonwing。
+
+The sample artwork and rig are original and MIT licensed. The current release packaging manifest still includes only Moonwing.
+
+## 跨引擎运行库 / Cross-engine runtimes (0.3)
+
+源码位于 `Runtimes/`。**AgeChaos 使用原生 ECS 骨骼；Unity、Unreal、Cocos 和原版 Godot 使用采样网格格式 `ageskeleton.meshclip` v2（读取兼容 v1）。** 后者保存各帧顶点位置，运行时线性插值，支持动画播放／暂停／跳转／变速、皮肤组合与插槽显隐。导出采样保留原有 IK 和蒙皮结果。v2 额外保存骨骼矩阵和逐顶点蒙皮影响，支持运行时 CCD IK 目标及带整数／浮点／字符串参数的动画事件。任意骨骼编辑、动画混合过渡仍未实现。资源大小随顶点数、动画时长和采样率增长。它不是完整骨骼运行时的等价替代，也没有跨引擎性能领先的保证。
+
+AgeChaos retains native ECS skeletal evaluation. The other engines use sampled vertex clips: IK and skinning are baked at export, then vertices interpolate during playback. Version 2 adds sampled bone matrices and per-influence local coordinates for runtime CCD IK targets, plus typed animation events. V1 reading remains supported. Arbitrary bone editing and crossfades remain unavailable. Size scales with vertices, duration and sampling rate. No performance superiority is implied.
+
+在编辑器的 **工程 → 导出** 中选择 **引擎运行库**，再选择 **Unity / Unreal / Cocos / Godot** 页签，指定一个尚不存在的目录。输出 `skeleton.ageskel.json` 和 PNG 图集页面，包含全部动画及皮肤。导出不改变当前姿态；现有目录不会被覆盖。当前格式只接受单骨架、普通透明混合；双色着色和乒乓循环会明确拒绝，不会静默丢失。也可通过本地会话导出：
+
+```powershell
+python tools/export_runtime.py <session.json> <new-output-directory> --entity 0 --fps 30
+```
+
+Use **Project → Export → Engine runtime → Unity / Unreal / Cocos / Godot**, or the CLI above. Export into a new directory and keep the JSON and PNG pages together. V2 accepts a single skeleton and normal alpha blending; unsupported two-color tint and ping-pong clips are rejected explicitly.
+
+图集打包复用原生 `SpriteAtlasBuilder`，不缩放、不裁剪、不旋转原图片，页面最大 2048，边缘扩展 2 像素。AgeChaos 导出为压缩的 `SharedTextures/*.res`，外部引擎导出为 PNG。超出页面限制的多图片源会明确报错，已经只有一张源纹理时保持原尺寸。原始 UV 须在 0..1 内。
+
+四个外部运行库均按附件顺序合批，**不会把 A → B → A 重排为 A → A → B**；多页面、材质差异和透明顺序仍可能产生多个批次。此处是角色内合批，不保证多个角色合为一次绘制。Wayfarer 的 23 张原图打包为 2 页（2048×2048、256×2048）；选用服装决定 1 或 3 个批次，Unity 原生图集二次打包后本案例为 1 批。当前动画仍为 JSON 采样数据，未实现二进制动画压缩。
+
+The shared native atlas builder preserves source pixels and UVs, with 2-pixel edge extrusion and 2048-pixel pages. External runtimes merge only contiguous attachments on the same texture, preserving A/B/A transparency order. Multiple pages can still require multiple batches; this is per-character batching. Animation data remains sampled JSON, not a compressed binary format.
+
+| Target | Integration | Validation in this iteration |
+| --- | --- | --- |
+| Unity 2022.3.15f1c1 / 6000.3.8f1 | `Runtimes/Unity` UPM package | Runtime IK/events and callbacks, direct/native atlas rendering and pixel comparison in both editors |
+| Godot 4.4+ | `Runtimes/Godot` C++ GDExtension | Windows x64 build, IK/event signals and Godot 4.4.1 rendering |
+| Unreal Engine 5 | `Runtimes/Unreal/AgeSkeleton` C++ plugin | Shared native core tested; UE build/device validation pending |
+| Cocos Creator 3.x | `Runtimes/Cocos` TypeScript component | Official 3.8.8 type check and evaluator tests; engine rendering pending |
+| AgeChaos | Built-in `ECSSkeleton2D` / `ECSWorld`, no additional package | Native compact ECS/shared-texture save-load and animation regression; platform/device rendering not revalidated |
+
+**Unity**：Package Manager → Add package from disk，选择 `Runtimes/Unity/package.json`。将导出文件复制到 `Assets`，选中 JSON，执行 **Tools → AgeSkeleton → Create Player From Selected JSON**，然后运行场景。导入工具会绑定 PNG 并生成材质；相机应朝向角色的 XY 平面。可通过 `AgeSkeletonPlayer.Play("Walk")`、`SetWardrobe("Tops", "Tops/Steel Armor")` 控制。材质须保留资源引用，避免构建时裁剪 shader。角色内按绘制顺序合并连续使用同一实际纹理的附件，姿态更新复用网格数组；用 `BatchCount` 查看批次数。需要 Unity 原生图集时，选择 **Create Player With Native Sprite Atlas**：创建 Sprite Atlas V2，设置为完整矩形、无旋转、无裁剪，并启用项目的 Sprite Atlas V2 模式。也可给组件手动指定 `spriteAtlas`。页面精灵名称须与导出页面文件名（不含扩展名）一致。运行时按原生图集的 UV 重映射，多个导出页面被装入同一原生页面时可继续合批。
+
+Unity: install the UPM package from disk, copy exported data into Assets, select the JSON and use the Tools menu to create a player. View its XY plane with a camera. The importer creates a material reference so the shader is included in builds. Contiguous attachments sharing an actual texture are merged; `BatchCount` reports the result. The **Create Player With Native Sprite Atlas** menu creates full-rectangle, untrimmed page sprites and a Sprite Atlas V2, enabling V2 packing for the project. Assign a native `spriteAtlas` manually if preferred; sprite names must match exported page basenames. Atlas UVs are remapped automatically. Cross-character batching is not provided.
+
+**Godot**：使用官方 `godot-cpp` 4.4 构建（SDK 不随本仓库复制）：
+
+```powershell
+cmake -S Runtimes/Godot -B <build-directory> -DGODOT_CPP_PATH=<godot-cpp-4.4-directory>
+cmake --build <build-directory> --config Release
+```
+
+将 `Runtimes/Godot/addons/ageskeleton` 复制到 Godot 项目；把动态库放入其 `bin/` 下。添加 `AgeSkeletonPlayer` 节点，设置 `source` 为 JSON 路径，通过 `play("Walk")`、`set_wardrobe(...)` 控制。GDScript 只负责调用，求值与绘制均为 C++。JSON 需要在 Godot 导出预设的非资源文件过滤器中包含（例如 `*.json`），PNG 也需随包导出。当前已构建 Windows x64 DLL；Linux/macOS 入口已列出但需自行编译，移动端/Web 未交付可用二进制。
+
+Godot: build against godot-cpp 4.4, copy the addon and matching library to the project, then add `AgeSkeletonPlayer`. Set `source` and call its exposed methods. Include JSON and PNG files when exporting the Godot project. Only Windows x64 was built and tested here; other platforms require matching builds.
+
+**UE5**：用 `tools/package_runtimes.py` 生成源码包，将解压后的 `AgeSkeleton` 放进项目 `Plugins/`，生成并编译 C++ 工程。在 Actor 上添加 `AgeSkeletonComponent`。导入 PNG，按 JSON 的 `textures` 顺序填入 `TexturePages`。创建双面、Unlit、Translucent 材质：`MainTexture` 纹理参数 × Vertex Color，RGB 接 Emissive，A 接 Opacity；赋给 `BaseMaterial`。`JsonFile` 指向 Content 下的 JSON，设置 `InitialAnimation`。蓝图提供 Play／Pause／Resume／Seek／SetWardrobe／SetSlotVisible 等。角色使用 XZ 平面。打包时将 JSON 目录加入 Additional Non-Asset Directories to Package；纹理、材质使用组件资源引用。当前无 UE5 环境，插件还需在 UE5 实际编译与渲染验收。
+
+UE5: package and copy the plugin to Plugins, compile, add the actor component, assign texture pages and an unlit two-sided translucent material with `MainTexture` multiplied by vertex color. JSON paths are relative to Content; stage that directory for packaged games. Blueprint controls are provided. The character lies on XZ. UE5 build/render validation is still pending.
+
+**Cocos**：将 `Runtimes/Cocos/*.ts` 和导出资源复制到 Creator 项目的 `assets`。给场景 Node 添加 `AgeSkeletonPlayer`，绑定 JsonAsset 和按顺序排列的 Texture2D，设置初始动画。使用普通 3D 相机查看 XY 平面；相机的可见层应包含角色。默认创建透明 unlit 材质，也可赋自定义材质。脚本可调用 `play`、`setWardrobe`、`setSlotVisible`。组件采用 Creator 3.8 动态网格 API；其他 3.x 小版本须验证 API，不能视为已全部兼容。
+
+可选绑定组件的 `spriteAtlas`，页面 SpriteFrame 名称与导出页面文件名（不含扩展名）匹配，必须关闭旋转和透明裁剪。组件用 SpriteFrame 区域重映射 UV，并按最终纹理合批；加载后若图集布局改变需重新 `load()`。使用默认朝向 XY 平面的相机，批次通过微小 Z 偏移排序；任意相机方向及角色交错排序仍需项目验证。
+
+Cocos native SpriteAtlas is optional. Use page-basename SpriteFrames, with rotation and trimming disabled. Reload after atlas layout changes. The component remaps UVs and merges consecutive attachments sharing the final texture. Transparent batch ordering uses small local Z offsets for the standard XY-plane camera.
+
+Cocos: copy the TypeScript files and assets into a Creator project, attach the component, assign the JSON and textures in export order, and view the XY plane with a 3D camera. The adapter uses the 3.8 dynamic mesh API; older 3.x minors and actual engine rendering remain to be validated.
+
+**AgeChaos**：直接使用引擎自带的 `ECSSkeleton2D` / `ECSWorld`，无需安装额外运行库或 `NativePlayer`。在 AgeSkeleton 中选择“引擎运行库 → AgeChaos”，导出原生 `.res` 与 `SharedTextures`，资源和图集一起放入游戏项目并加载到 ECS 实体。骨骼与蒙皮由原生 ECS 更新，不使用通用网格采样数据。
+
+```csharp
+// world and skeletonEntity belong to the game. Keep this controller while in use.
+var skeleton = world.GetSkeletonController(skeletonEntity);
+skeleton.Play("Walk");
+skeleton.SetSkin("Tops/Steel Armor");
+skeleton.SetSlotAttachment("Weapon", ""); // Clear the current attachment.
+// Before destroying the entity/world, or unloading the game script:
+skeleton.Dispose();
+```
+
+组合皮肤通过 `world.SetSkeleton2D` 设置 `active_skins`；跳转时间通过 `world.SetAnimation` 设置 `time`。这些是现有原生组件接口，无需创建另一个播放器。清空插槽附件不等于持久的强制隐藏，后续动画附件关键帧仍可改变它。
+
+AgeChaos: use the built-in `ECSSkeleton2D` / `ECSWorld` directly; no separate runtime package or player wrapper is required. Export native `.res` assets with SharedTextures. Dispose the controller before destroying its entity/world. Use `SetSkeleton2D` with `active_skins` for skin composition and `SetAnimation` with `time` for seeking. Animation attachment keys can override a manual attachment change.
+
+其他引擎源码包生成（Unity、Cocos、Unreal、Godot；AgeChaos 无需包） / Source archives for external engines (AgeChaos needs no package):
+
+```powershell
+python tools/package_runtimes.py --output <new-package-output-directory>
+```
+
+Windows 验收不代表 Android、iOS、Web 或其他平台验收通过。运行库原创部分采用与编辑器相同的限制商业化许可，禁止商业游戏集成；原生解析器保留 `Runtimes/Native/third_party/LICENSE.json`，Godot C++ 动态库还须随附 godot-cpp 的许可证。
+
+Windows validation does not certify Android, iOS, Web or other platforms. Original runtime code uses the same restricted commercialization license as the editor; commercial integration is prohibited; preserve the JSON parser and godot-cpp notices when distributing native libraries.
+
+### 运行时 IK 与事件 / Runtime IK and events
+
+- Unity：`SetIKTarget(bone, x, y, chainLength, mix)` / `ClearIKTarget(bone)` / `GetBoneTip(bone)`；订阅 `AnimationEvent`。
+- Godot C++：`set_ik_target(bone, Vector2, chain_length, mix)` / `clear_ik_target` / `get_bone_tip`；连接 `animation_event(name, payload)` 信号（延迟派发，payload 含 animation/time/int/float/string）。
+- UE5：`SetIKTarget` / `ClearIKTarget` / `GetBoneTip` 蓝图接口；`OnAnimationEvent` 多播事件。
+- Cocos：`setIKTarget` / `clearIKTarget` / `getBoneTip`；监听节点 `ageskeleton-event`。
+
+坐标统一为**导出骨架本地像素，Y 向下**，不是游戏世界坐标；引擎的 pixelsPerUnit 不改变这些接口的坐标。骨骼按导出名称选择，链长为 1–16 且不得超过祖先链；mix 为 0–1。更改目标即时更新蒙皮，清除目标恢复采样姿态。重叠 IK 链按导出骨骼顺序求解。v1 数据没有实时 IK 信息，需要重新导出。
+
+事件保留原始关键帧时间，支持正放、倒放及跨多轮循环；暂停、零步长和跳转不补发事件。重新播放后的第一次非零更新包含起点事件；循环边界同时存在尾帧和首帧事件时两者均触发。一次更新超过 4096 次事件会拒绝该步，保持时间不变；应使用较小步长。事件仅在相应次更新派发，修改皮肤或 IK 不触发事件。
+
+IK targets use exported skeleton-local pixels (Y down), independent of world transforms. Events preserve authored times and typed payloads; forward/reverse looping is supported. Pause, zero steps and seek do not emit skipped events. More than 4096 event occurrences in one update rejects the step atomically. V1 needs re-export for IK and events. Crossfades and arbitrary bone editing remain unavailable.
 
 ## 直接使用 / Run the existing build
 
@@ -191,7 +311,9 @@ python tools/skeleton_ai.py --help
 
 ## 许可证 / License
 
-AgeSkeleton 原创代码与图标采用 [MIT](LICENSE.txt)。允许使用、修改、商用和再分发，须保留相应版权和许可声明。
+AgeSkeleton 原创编辑器、运行库和图标采用 [免费使用与限制商业化许可 1.0](LICENSE.txt)。可免费使用、自行修改和内部集成，无须仅因内部使用公开源码。**无论是否开源，均禁止对外商业发行衍生版本或提供集成编辑器／运行库的商业产品与服务，包括未修改的运行库。** 用户自己制作的图片、动画不自动受这份软件许可限制。
+
+这是源码可用项目，不再按 MIT／OSI 开源许可宣传。已按 MIT 分发的旧版本既有授权不因本次修改撤销。
 
 Godot 及其他第三方组件遵循各自许可证，见 [第三方说明](THIRD_PARTY_NOTICES.md) 和 [版权清单](COPYRIGHT.txt)。本项目不包含 Spine 编辑器或其商业运行时；第三方素材的使用权须由使用者自行取得。
 
@@ -199,4 +321,4 @@ AgeSkeleton 是独立项目，与 Esoteric Software 无隶属、合作或认可�
 
 AgeSkeleton is independent and is not affiliated with, sponsored by, or endorsed by Esoteric Software. Spine is referenced only to describe format compatibility. Importing or converting an asset does not change its license. Official Spine example artwork is not included.
 
-Original AgeSkeleton code and artwork are MIT-licensed. Preserve the licenses and notices of Godot and all other third-party components.
+Original AgeSkeleton software and icons use the Free Use and Restricted Commercialization License 1.0. Free use, private modification and internal integration are allowed without source publication. External commercial distribution and services, including commercial products integrating an unmodified runtime, are prohibited whether or not source code is disclosed. Independently created output is not covered merely because it was made with the editor. This is source-available, not MIT/OSI open source. Existing grants for previously distributed MIT revisions remain valid. Preserve all Godot and third-party notices.

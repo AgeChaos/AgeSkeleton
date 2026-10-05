@@ -1,5 +1,6 @@
 #ifdef TOOLS_ENABLED
 #include "ecs_animation_editor.h"
+#include "skeleton_runtime_export.h"
 #include "ecs_skeleton_icons.h"
 #include "core/io/config_file.h"
 #include "core/config/project_settings.h"
@@ -79,6 +80,18 @@ static void apply_skeleton_dialog_theme(ConfirmationDialog *dialog) {
             export_theme->set_stylebox(state,"ItemList",surface(Color(.19,.34,.43),0));
         }
         export_theme->set_color("font_selected_color","ItemList",Color(.94,.98,1));
+        for (const char *state : {"tab_unselected", "tab_hovered", "tab_selected"}) {
+            const bool selected=String(state)=="tab_selected";
+            auto tab=surface(selected?Color(.23,.29,.34):String(state)=="tab_hovered"?Color(.20,.22,.25):Color(.16,.175,.19),10);
+            tab->set_corner_radius_all(0);
+            tab->set_content_margin(SIDE_LEFT,16*EDSCALE); tab->set_content_margin(SIDE_RIGHT,16*EDSCALE);
+            tab->set_border_width(SIDE_BOTTOM,2*EDSCALE);
+            tab->set_border_color(selected?Color(.32,.65,.84):Color(.26,.28,.31));
+            export_theme->set_stylebox(state,"TabBar",tab);
+        }
+        export_theme->set_font_size("font_size","TabBar",14*EDSCALE);
+        export_theme->set_color("font_selected_color","TabBar",Color(.95,.97,1));
+        export_theme->set_color("font_unselected_color","TabBar",Color(.68,.72,.78));
         dialog->set_theme(export_theme);
         auto primary=surface(Color(.18,.43,.58),9);
         dialog->get_ok_button()->add_theme_style_override("normal",primary);
@@ -147,13 +160,16 @@ void ECSAnimationEditor::open_asset_export() {
     if(!asset_export_dialog) {
         asset_export_dialog=memnew(ConfirmationDialog); asset_export_dialog->set_name("SkeletonExport"); asset_export_dialog->set_title(String(U"导出")); asset_export_dialog->set_ok_button_text(String(U"导出")); asset_export_dialog->get_cancel_button()->set_text(String(U"取消")); asset_export_dialog->set_hide_on_ok(false); add_child(asset_export_dialog); asset_export_dialog->connect("confirmed",callable_mp(this,&ECSAnimationEditor::perform_asset_export));
         apply_skeleton_dialog_theme(asset_export_dialog);
-        asset_export_dialog->add_button(String(U"恢复默认"),true)->connect("pressed",callable_mp(this,&ECSAnimationEditor::reset_asset_export)); asset_export_dialog->add_button(String(U"预览"),true)->connect("pressed",callable_mp(this,&ECSAnimationEditor::preview_asset_export));
         auto *body=memnew(HBoxContainer); body->add_theme_constant_override("separation",22*EDSCALE); asset_export_dialog->add_child(body);
         export_formats=memnew(ItemList); export_formats->set_custom_minimum_size(Size2(160,280)*EDSCALE); body->add_child(export_formats);
-        export_formats->add_item(String(U"骨骼资源"),skeleton_workspace_icon("bone")); for(const char *format:{"PNG","JPEG","WebP","PNG 序列帧","精灵图集","GIF 动画","AVI 视频"}) { export_formats->add_item(String::utf8(format),skeleton_workspace_icon("attachment")); }
+        export_formats->add_item(TTR("Engine runtime"),skeleton_workspace_icon("bone")); for(const char *format:{"PNG","JPEG","WebP","PNG 序列帧","精灵图集","GIF 动画","AVI 视频"}) { export_formats->add_item(String::utf8(format),skeleton_workspace_icon("attachment")); }
         export_formats->connect("item_selected",callable_mp(this,&ECSAnimationEditor::export_format_changed));
-        auto *options=memnew(VBoxContainer); options->add_theme_constant_override("separation",14*EDSCALE); options->set_h_size_flags(SIZE_EXPAND_FILL); body->add_child(options);
-        export_description=dialog_label(options,String()); export_description->set_custom_minimum_size(Size2(470,60)*EDSCALE); export_description->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART); export_description->add_theme_color_override("font_color",Color(.68,.73,.79));
+        auto *options=memnew(VBoxContainer); options->add_theme_constant_override("separation",10*EDSCALE); options->set_h_size_flags(SIZE_EXPAND_FILL); body->add_child(options);
+        export_engine_tabs=memnew(TabBar);export_engine_tabs->set_name("ExportEngineTabs");export_engine_tabs->set_tab_alignment(TabBar::ALIGNMENT_LEFT);options->add_child(export_engine_tabs);
+        for(const char *engine:{"AgeChaos","Godot","Unreal","Unity","Cocos"}) export_engine_tabs->add_tab(engine);
+        export_engine_tabs->set_current_tab(0);
+        export_engine_tabs->connect("tab_changed",callable_mp(this,&ECSAnimationEditor::export_engine_changed));
+        export_description=dialog_label(options,String()); export_description->set_custom_minimum_size(Size2(470,64)*EDSCALE); export_description->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART); export_description->add_theme_color_override("font_color",Color(.68,.73,.79));
         export_path=memnew(LineEdit); export_path->set_name("ExportPath"); export_path_label=dialog_label(options,String(U"输出文件")); auto *path_row=memnew(HBoxContainer); path_row->add_theme_constant_override("separation",10*EDSCALE); options->add_child(path_row); path_row->add_child(export_path); export_path->set_custom_minimum_size(Size2(0,36)*EDSCALE); export_path->set_h_size_flags(SIZE_EXPAND_FILL); auto *browse=memnew(Button); browse->set_text(String(U"浏览…")); path_row->add_child(browse); browse->connect("pressed",callable_mp(this,&ECSAnimationEditor::browse_export_file));
         auto *image_options=memnew(VBoxContainer); image_options->add_theme_constant_override("separation",12*EDSCALE); options->add_child(image_options); export_image_options=image_options;
         export_scale=dialog_number(10,400,1); export_scale->set_suffix("%"); dialog_row(image_options,String(U"大小缩放"),export_scale);
@@ -163,11 +179,28 @@ void ECSAnimationEditor::open_asset_export() {
         export_quality=dialog_number(1,100,1); dialog_row(image_options,String(U"JPEG 质量"),export_quality);
         auto *motion=memnew(VBoxContainer); motion->add_theme_constant_override("separation",12*EDSCALE); options->add_child(motion); export_motion_options=motion;
         export_animation=memnew(OptionButton); dialog_row(motion,String(U"动画"),export_animation);
-        export_fps=dialog_number(1,60,1); export_fps->set_value(30); dialog_row(motion,String(U"导出帧率"),export_fps);
+        export_fps=dialog_number(1,60,1); export_fps->set_value(30); auto *fps_row=memnew(HBoxContainer); fps_row->add_theme_constant_override("separation",14*EDSCALE); motion->add_child(fps_row);
+        dialog_label(fps_row,String(U"导出帧率"))->set_custom_minimum_size(Size2(100,0)*EDSCALE);
+        export_fps->set_custom_minimum_size(Size2(120,32)*EDSCALE); fps_row->add_child(export_fps);
         asset_export_dialog->connect("canceled",callable_mp(this,&ECSAnimationEditor::cancel_motion_export));
         export_open=memnew(CheckBox); export_open->set_text(String(U"导出后打开所在目录")); options->add_child(export_open);
-        export_status=dialog_label(options,String()); export_status->set_custom_minimum_size(Size2(500,36)*EDSCALE); export_status->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART); export_status->set_max_lines_visible(3); export_status->set_text_overrun_behavior(TextServer::OVERRUN_TRIM_ELLIPSIS);
-        export_file_dialog=memnew(EditorFileDialog); export_file_dialog->set_access(EditorFileDialog::ACCESS_FILESYSTEM); export_file_dialog->set_file_mode(EditorFileDialog::FILE_MODE_SAVE_FILE); asset_export_dialog->add_child(export_file_dialog); export_file_dialog->connect("file_selected",callable_mp(this,&ECSAnimationEditor::export_file_chosen));
+        export_status=dialog_label(options,String()); export_status->set_custom_minimum_size(Size2(470,24)*EDSCALE); export_status->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART); export_status->set_max_lines_visible(3); export_status->set_text_overrun_behavior(TextServer::OVERRUN_TRIM_ELLIPSIS);
+        auto *action_space=memnew(Control); action_space->set_v_size_flags(SIZE_EXPAND_FILL); options->add_child(action_space);
+        auto *footer=memnew(HBoxContainer); footer->set_name("ExportPageActions"); footer->add_theme_constant_override("separation",8*EDSCALE); options->add_child(footer);
+        auto *reset=memnew(Button); reset->set_text(TTR("Reset to Defaults")); footer->add_child(reset);
+        reset->connect("pressed",callable_mp(this,&ECSAnimationEditor::reset_asset_export));
+        export_preview_button=memnew(Button); export_preview_button->set_text(TTR("Preview")); footer->add_child(export_preview_button);
+        export_preview_button->connect("pressed",callable_mp(this,&ECSAnimationEditor::preview_asset_export));
+        footer->add_spacer();
+        // Place actions inside the current page; retain the dialog's existing confirm/cancel signals.
+        auto *dialog_footer=Object::cast_to<Control>(asset_export_dialog->get_ok_button()->get_parent());
+        asset_export_dialog->get_cancel_button()->reparent(footer,false);
+        asset_export_dialog->get_ok_button()->reparent(footer,false);
+        dialog_footer->hide(); asset_export_dialog->add_theme_constant_override("buttons_separation",0);
+        for(Button *button:{reset,export_preview_button,asset_export_dialog->get_cancel_button(),asset_export_dialog->get_ok_button()}) {
+            button->set_custom_minimum_size(Size2(96,36)*EDSCALE); button->set_h_size_flags(SIZE_SHRINK_BEGIN);
+        }
+        export_file_dialog=memnew(EditorFileDialog); export_file_dialog->set_access(EditorFileDialog::ACCESS_FILESYSTEM); export_file_dialog->set_file_mode(EditorFileDialog::FILE_MODE_SAVE_FILE); asset_export_dialog->add_child(export_file_dialog); export_file_dialog->connect("file_selected",callable_mp(this,&ECSAnimationEditor::export_file_chosen)); export_file_dialog->connect("dir_selected",callable_mp(this,&ECSAnimationEditor::export_file_chosen));
         reset_asset_export();
         Ref<ConfigFile> config=read_preferences();
         export_scale->set_value(config->get_value("export","scale",100)); export_quality->set_value(config->get_value("export","quality",90)); export_crop->set_pressed(config->get_value("export","crop",true)); export_alpha->set_pressed(config->get_value("export","alpha",true)); export_background->set_pick_color(config->get_value("export","background",Color(.2,.2,.2))); export_open->set_pressed(config->get_value("export","open",false));
@@ -177,17 +210,48 @@ void ECSAnimationEditor::open_asset_export() {
     export_formats->select(0); export_format_changed(0); asset_export_dialog->popup_centered(Size2(780,420)*EDSCALE);
 }
 void ECSAnimationEditor::reset_asset_export() { if(motion_exporting) { return; } if(export_fps) { export_fps->set_value(30); } export_scale->set_value(100); export_quality->set_value(90); export_crop->set_pressed(true); export_alpha->set_pressed(true); export_background->set_pick_color(Color(.2,.2,.2)); export_open->set_pressed(false); }
+void ECSAnimationEditor::export_engine_changed(int p_engine) {
+    export_engine_paths[export_engine_index]=export_path->get_text();export_engine_index=p_engine;
+    export_format_changed(0);
+    if(!export_engine_paths[p_engine].is_empty()) export_path->set_text(export_engine_paths[p_engine]);
+}
+int ECSAnimationEditor::selected_export_format() const {
+    int index=export_formats->get_selected_items()[0];return index==0 && export_engine_tabs->get_current_tab()>0?8:index;
+}
 void ECSAnimationEditor::export_format_changed(int index) {
+    export_engine_tabs->set_visible(index==0);
+    export_preview_button->set_visible(index!=0);
+    if(index==0 && export_engine_tabs->get_current_tab()>0) index=8;
+    if(index==8) {
+        export_path_label->set_text(TTR("New runtime package folder")); export_image_options->hide(); export_motion_options->show();
+        Object::cast_to<Control>(export_animation->get_parent())->hide();
+        String engine=export_engine_tabs->get_tab_title(export_engine_tabs->get_current_tab());
+        String detail;
+        switch(export_engine_tabs->get_current_tab()) {
+            case 1: detail=TTR("Godot 4.4+: use the C++ GDExtension and imported atlas textures.");break;
+            case 2: detail=TTR("Unreal Engine 5: import Texture2D pages and use the C++ plugin with a translucent material.");break;
+            case 3: detail=TTR("Unity 2022.3 / 6: import atlas textures with the UPM runtime, or use Unity Sprite Atlas.");break;
+            case 4: detail=TTR("Cocos Creator 3.8: use the TypeScript component with textures or a native SpriteAtlas (no trim or rotation).");break;
+        }
+        export_description->set_text(detail+"\n"+TTR("Exports all clips and skins with PNG atlases, runtime IK targets and animation events. Animation crossfades are not included. Choose a new folder."));
+        String name=scene->get_path().get_file().get_basename().trim_suffix(".ecsrig");
+        export_path->set_text(ProjectSettings::get_singleton()->globalize_path(scene->get_path().get_base_dir().path_join(name+"_"+engine.to_lower()))); export_status->set_text(String());return;
+    }
+    Object::cast_to<Control>(export_animation->get_parent())->show();
     const char *extensions[]={"res","png","jpg","webp","json","png","gif","avi"};
     export_path_label->set_text(index==0?String(U"动画资源文件"):String(U"输出文件"));
     export_image_options->set_visible(index!=0); export_alpha->set_disabled(index==2 || index==7); export_crop->set_disabled(index>=4); export_motion_options->set_visible(index>=4); export_quality->set_editable(index==2); Object::cast_to<Control>(export_quality->get_parent())->set_visible(index==2); export_crop->set_visible(index<4);
-    export_description->set_text(index==0?String(U"导出动画资源（骨架、全部动画、皮肤）和独立图集。\n图集保存在同级 SharedTextures 文件夹，使用时请一并保留。"):String(U"当前视口姿态 · 导出可见图片，不包含参考线、骨骼线和操作控件。\n视口以外的内容不会导出；WebP 使用无损编码。"));
+    export_description->set_text(index==0?TTR("Native support"):String(U"当前视口姿态 · 导出可见图片，不包含参考线、骨骼线和操作控件。\n视口以外的内容不会导出；WebP 使用无损编码。"));
     if(index>=4) { export_description->set_text(String(U"按所选动画逐帧导出，保持视口尺寸与原点一致；不裁切单帧。\n序列帧 / 图集附带 JSON；GIF 循环播放；AVI 为无音轨 MJPEG 视频。")); }
+    if(index==0) {
+        String name=scene->get_path().get_file().get_basename().trim_suffix(".ecsrig");if(name.is_empty()) name="Skeleton";
+        export_path->set_text(export_engine_paths[0].is_empty()?ProjectSettings::get_singleton()->globalize_path(scene->get_path().get_base_dir().path_join(name+"_agechaos.res")):export_engine_paths[0]);export_status->set_text(String());return;
+    }
     String base=export_path->get_text(); if(base.is_empty()) { String directory=read_preferences()->get_value("files","export_directory",""); if(directory.is_empty()) { directory=scene->get_path().get_base_dir(); } if(directory.is_empty()) { directory="res://"; } String name=scene->get_path().get_file().get_basename().trim_suffix(".ecsrig"); if(name.is_empty()) { name="Skeleton"; } base=ProjectSettings::get_singleton()->globalize_path(directory).path_join(name+"_export"); } else { base=base.get_basename(); }
     export_path->set_text(ProjectSettings::get_singleton()->globalize_path(base+"."+extensions[index])); export_status->set_text(String());
 }
-void ECSAnimationEditor::browse_export_file() { if(motion_exporting) { return; } int index=export_formats->get_selected_items()[0]; const char *extensions[]={"*.res","*.png","*.jpg","*.webp","*.json","*.png","*.gif","*.avi"}; export_file_dialog->clear_filters(); export_file_dialog->add_filter(extensions[index]); export_file_dialog->set_current_path(export_path->get_text()); export_file_dialog->popup_centered_ratio(.7); }
-void ECSAnimationEditor::export_file_chosen(const String &path) { export_path->set_text(path); }
+void ECSAnimationEditor::browse_export_file() { if(motion_exporting) { return; } int index=selected_export_format(); if(index==8) { export_file_dialog->clear_filters();export_file_dialog->set_file_mode(EditorFileDialog::FILE_MODE_OPEN_DIR);export_file_dialog->set_current_dir(export_path->get_text().get_base_dir());export_file_dialog->popup_centered_ratio(.7);return; } export_file_dialog->set_file_mode(EditorFileDialog::FILE_MODE_SAVE_FILE); const char *extensions[]={"*.res","*.png","*.jpg","*.webp","*.json","*.png","*.gif","*.avi"}; export_file_dialog->clear_filters(); export_file_dialog->add_filter(extensions[index]); export_file_dialog->set_current_path(export_path->get_text()); export_file_dialog->popup_centered_ratio(.7); }
+void ECSAnimationEditor::export_file_chosen(const String &path) { export_path->set_text(selected_export_format()==8?path.path_join("Skeleton_runtime"):path); }
 Ref<Image> ECSAnimationEditor::prepare_export_image() {
     Ref<Image> image=local_canvas->capture_canvas(); if(image.is_null() || image->is_empty()) { export_status->set_text(String(U"画布尚未完成渲染。")); return Ref<Image>(); }
     image=image->duplicate(); image->convert(Image::FORMAT_RGBA8);
@@ -195,12 +259,13 @@ Ref<Image> ECSAnimationEditor::prepare_export_image() {
     int width=MAX(1,int(Math::round(image->get_width()*export_scale->get_value()/100.0))),height=MAX(1,int(Math::round(image->get_height()*export_scale->get_value()/100.0)));
     if(int64_t(width)*height>64000000 || width>16384 || height>16384) { export_status->set_text(String(U"导出图片过大，请降低缩放。")); return Ref<Image>(); }
     image->resize(width,height,Image::INTERPOLATE_LANCZOS);
-    if(!export_alpha->is_pressed() || (export_formats->get_selected_items()[0]==2 || export_formats->get_selected_items()[0]==7)) { Ref<Image> background=Image::create_empty(width,height,false,Image::FORMAT_RGBA8); background->fill(export_background->get_pick_color()); background->blend_rect(image,Rect2i(0,0,width,height),Point2i()); image=background; }
+    if(!export_alpha->is_pressed() || (selected_export_format()==2 || selected_export_format()==7)) { Ref<Image> background=Image::create_empty(width,height,false,Image::FORMAT_RGBA8); background->fill(export_background->get_pick_color()); background->blend_rect(image,Rect2i(0,0,width,height),Point2i()); image=background; }
     return image;
 }
 void ECSAnimationEditor::preview_asset_export() {
     if(motion_exporting) { return; }
-    const int format=export_formats->get_selected_items()[0];
+    const int format=selected_export_format();
+    if(format==8) { export_status->set_text(TTR("Preview this package in the target engine using its AgeSkeleton runtime."));return; }
     if(format>=4) {
         String path=export_path->get_text();
         if(!FileAccess::exists(path)) { export_status->set_text(String(U"请先导出，再预览生成的动画或图集。")); return; }
@@ -208,7 +273,7 @@ void ECSAnimationEditor::preview_asset_export() {
         else { Error result=OS::get_singleton()->shell_open(path); if(result!=OK) { export_status->set_text(String(U"未找到该格式的查看程序，请从导出目录打开。")); } }
         return;
     }
-    if(export_formats->get_selected_items()[0]==0) { export_status->set_text(String(U"资源包含 ")+itos(scene->get_entities().size())+String(U" 个实体；图片预览请先选择图片格式。")); return; }
+    if(selected_export_format()==0) { export_status->set_text(String(U"资源包含 ")+itos(scene->get_entities().size())+String(U" 个实体；图片预览请先选择图片格式。")); return; }
     Ref<Image> image=prepare_export_image(); if(image.is_null()) { return; }
     if(export_preview_dialog) { export_preview_dialog->queue_free(); }
     export_preview_dialog=memnew(ConfirmationDialog); export_preview_dialog->set_title(vformat(String(U"导出预览 · %d × %d"),image->get_width(),image->get_height())); asset_export_dialog->add_child(export_preview_dialog);
@@ -217,8 +282,13 @@ void ECSAnimationEditor::preview_asset_export() {
 void ECSAnimationEditor::confirm_asset_overwrite() { confirmed_export_path=pending_export_path; perform_asset_export(); }
 void ECSAnimationEditor::perform_asset_export() {
     if(motion_exporting) { return; }
+    if(selected_export_format()==8) {
+        Dictionary result=export_skeleton_runtime(scene,find_rig(target->get_selected_id()),export_path->get_text().strip_edges(),int(export_fps->get_value()));
+        export_status->set_text(bool(result.get("ok",false))?TTR("Runtime package exported")+String(": ")+String(result["path"]):TTR("Runtime export failed")+String(": ")+String(result.get("error",String())));
+        if(bool(result.get("ok",false)) && export_open->is_pressed()) { OS::get_singleton()->shell_show_in_file_manager(result["path"]); }return;
+    }
     String error;
-    String path=export_path->get_text().strip_edges(); int index=export_formats->get_selected_items()[0]; const char *extensions[]={"res","png","jpg","webp","json","png","gif","avi"};
+    String path=export_path->get_text().strip_edges(); int index=selected_export_format(); const char *extensions[]={"res","png","jpg","webp","json","png","gif","avi"};
     if(path.is_empty() || path.get_extension().to_lower()!=extensions[index]) { export_status->set_text(String(U"输出文件扩展名应为 .")+extensions[index]); return; }
     if(!DirAccess::dir_exists_absolute(path.get_base_dir())) { export_status->set_text(String(U"输出目录不存在，请先选择已有目录。")); return; }
     if((FileAccess::exists(path) || (index==5 && FileAccess::exists(path+".json"))) && confirmed_export_path!=path) {

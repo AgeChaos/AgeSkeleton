@@ -1,0 +1,23 @@
+{
+  "name": "Wayfarer",
+  "license": "MIT",
+  "source": "Original SVG paths, rest joints, weights and motion in tools/generate_wardrobe.py",
+  "bones": 11,
+  "attachments": 23,
+  "skins": [
+    "default",
+    "Tops/Scout Tunic",
+    "Tops/Travel Jacket",
+    "Tops/Steel Armor",
+    "Bottoms/Canvas Trousers",
+    "Bottoms/Ranger Boots",
+    "Headwear/Feather Cap",
+    "Headwear/Knight Helm",
+    "Weapons/Short Sword",
+    "Weapons/Oak Staff"
+  ],
+  "animations": [
+    "Idle",
+    "Walk"
+  ]
+}

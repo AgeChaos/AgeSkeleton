@@ -1,6 +1,7 @@
 #ifdef TOOLS_ENABLED
 #include "ecs_animation_editor.h"
 #include "skeleton_workspace_docking.h"
+#include "skeleton_attachment_tree.h"
 #include "ecs_skeleton_icons.h"
 #include "ecs_timeline_layout.h"
 #include "ecs_spine_import.h"
@@ -476,11 +477,12 @@ ECSAnimationEditor::ECSAnimationEditor() {
 	auto *right=memnew(VBoxContainer); tree_frame->add_child(right);
 	title=build_panel_header(right,String(U"层级树"),"skeleton",false);
 	build_hierarchy_toolbar(right);
-	hierarchy=memnew(Tree); hierarchy->set_columns(3); hierarchy->set_column_title(0,String(U"层级 / 名称")); hierarchy->set_column_title(1,String(U"显示")); hierarchy->set_column_title(2,String(U"锁定")); hierarchy->set_column_titles_visible(true);
+	hierarchy=memnew(SkeletonAttachmentTree); hierarchy->set_columns(3); hierarchy->set_column_title(0,String(U"层级 / 名称")); hierarchy->set_column_title(1,String(U"显示")); hierarchy->set_column_title(2,String(U"锁定")); hierarchy->set_column_titles_visible(true);
     hierarchy->set_column_expand(1,false); hierarchy->set_column_expand(2,false); hierarchy->set_column_custom_minimum_width(1,42*EDSCALE); hierarchy->set_column_custom_minimum_width(2,42*EDSCALE);
     hierarchy->add_theme_font_size_override("font_size",14*EDSCALE); hierarchy->add_theme_constant_override("v_separation",4*EDSCALE); hierarchy->add_theme_constant_override("h_separation",8*EDSCALE); hierarchy->add_theme_constant_override("item_margin",20*EDSCALE); hierarchy->add_theme_constant_override("draw_guides",1); hierarchy->add_theme_color_override("guide_color",Color(.43,.46,.49,.5));
     hierarchy->connect("button_clicked",callable_mp(this,&ECSAnimationEditor::hierarchy_item_button)); hierarchy->set_hide_root(true); hierarchy->set_custom_minimum_size(Size2(0,220)); hierarchy->set_v_size_flags(SIZE_EXPAND_FILL); right->add_child(hierarchy); // Skin selection can rebuild the hierarchy; wait until Tree releases its input lock.
     hierarchy->connect("item_selected",callable_mp(this,&ECSAnimationEditor::hierarchy_selected),CONNECT_DEFERRED);
+    hierarchy->connect("item_activated",callable_mp(this,&ECSAnimationEditor::hierarchy_activated),CONNECT_DEFERRED);
 	auto *property_frame=framed(sidebar); property_frame->set_custom_minimum_size(Size2(0,260)*EDSCALE); property_frame->set_stretch_ratio(1.0);
 	auto *right_scroll=memnew(ScrollContainer); right_scroll->set_horizontal_scroll_mode(ScrollContainer::SCROLL_MODE_DISABLED); property_frame->add_child(right_scroll);
 	right=memnew(VBoxContainer); right->set_h_size_flags(SIZE_EXPAND_FILL); right_scroll->add_child(right);
@@ -495,6 +497,7 @@ ECSAnimationEditor::ECSAnimationEditor() {
     selection_name=memnew(LineEdit); selection_name->set_h_size_flags(SIZE_EXPAND_FILL); name_row->add_child(selection_name); selection_name->connect("text_submitted",callable_mp(this,&ECSAnimationEditor::selection_property_changed).unbind(1)); selection_name->connect("focus_exited",callable_mp(this,&ECSAnimationEditor::selection_property_changed));
     selection_length=number(String(U"长度"),0,100000,.1); bone_properties=Object::cast_to<Control>(selection_length->get_parent()); selection_length->set_allow_greater(false); selection_length->connect("value_changed",callable_mp(this,&ECSAnimationEditor::selection_property_changed).unbind(1));
 	transform_property_host=section(right,TTR("Transform"),false); transform_property_host->set_name("TransformProperties");
+	wardrobe_tools=section(right,TTR("Wardrobe"),false); wardrobe_tools->set_name("Wardrobe");
 	build_slot_tools(section(right,String(U"皮肤与插槽"),true));
 	auto *property_host=right; right=section(property_host,String(U"动画与关键帧"),false); animation_property_panel=Object::cast_to<Control>(right->get_parent());
 	states=memnew(OptionButton); right->add_child(states); state_name=memnew(LineEdit); state_name->set_placeholder(String(U"动画名称")); right->add_child(state_name);
@@ -631,6 +634,16 @@ void ECSAnimationEditor::timeline_action(int command) {
 	}
 }
 void ECSAnimationEditor::save_scene() { project_action(2); }
+void ECSAnimationEditor::hierarchy_activated() {
+    TreeItem *item=hierarchy->get_selected();
+    if(!item || item->get_metadata(0).get_type()!=Variant::INT || scene.is_null()) { return; }
+    int index=item->get_metadata(0);
+    if(index<0 || index>=scene->get_entities().size() || !Dictionary(scene->get_entities()[index]).has("polygon_2d")) { return; }
+    bool was_playing=playing;
+    select_target(index);
+    playing=was_playing;
+    local_canvas->frame_selected_attachment();
+}
 void ECSAnimationEditor::hierarchy_selected() {
     if(refreshing || !hierarchy->get_selected()) { return; }
     TreeItem *selected=hierarchy->get_selected(); Variant metadata=selected->get_metadata(0);
@@ -723,7 +736,11 @@ void ECSAnimationEditor::select_target(int index) {
 	}
 	target->select(index);
 	refreshing=true;
+	// Programmatic selection must not enqueue the deferred user-selection handler,
+	// which would seek again and pause playback after an AI or wardrobe action.
+	bool blocked=hierarchy->is_blocking_signals(); hierarchy->set_block_signals(true);
 	for(TreeItem *row=hierarchy->get_root()?hierarchy->get_root()->get_next_in_tree():nullptr;row;row=row->get_next_in_tree()) { if(row->get_metadata(0).get_type()==Variant::INT && int(row->get_metadata(0))==index) { row->select(0); break; } }
+	hierarchy->set_block_signals(blocked);
 	refreshing=false;
 	local_canvas->edit_scene(scene,index);
 	if(animation_mode) { seek(time->get_value()); }
@@ -738,7 +755,7 @@ void ECSAnimationEditor::edit_scene(const Ref<ECSScene> &value,ECSUICanvasEditor
 	if(independent_project && scene!=value) { return; }
 	refreshing=true; int previous=owner->get_selected_id(), previous_target=target->get_selected_id(), previous_brush=brush_bone->get_selected_id(); bool different=scene!=value;
 	if(different) { selection_history.clear(); selection_history_cursor=-1; timeline->reset_view(); image_selection=-1; mesh_edit->set_pressed(false); brush_enabled->set_pressed(false); editing_state=String(); playing=false; selected_key=Vector2i(-1,-1); }
-	scene=value; canvas=local_canvas; local_canvas->edit_scene(value,MAX(0,previous_target)); local_canvas->set_keyframe_edit_mode(animation_mode);
+	scene=value; static_cast<SkeletonAttachmentTree *>(hierarchy)->set_scene(value); canvas=local_canvas; local_canvas->edit_scene(value,MAX(0,previous_target)); local_canvas->set_keyframe_edit_mode(animation_mode);
 	owner->clear(); target->clear(); hierarchy->clear(); brush_bone->clear();
 	if(scene.is_null()) { animation_list->clear(); refreshing=false; return; }
 	Array entities=scene->get_entities(); auto *root=hierarchy->create_item(); Vector<TreeItem *> rows;

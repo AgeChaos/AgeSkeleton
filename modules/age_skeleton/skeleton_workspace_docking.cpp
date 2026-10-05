@@ -39,7 +39,7 @@ void SkeletonWorkspaceDocking::configure_base_layout(bool p_side_by_side) {
 	// Keep the original base profile available when replaying older saved layouts:
 	// their split offsets and docking operations were recorded against that profile.
 	SplitContainer *left=workspace_splits[1],*sheet=workspace_splits[2],*sidebar=workspace_splits[3];
-	sidebar->set_vertical(p_side_by_side?false:true);
+	sidebar->set_vertical(!p_side_by_side);
 	left->set_stretch_ratio(p_side_by_side?3.0:1.0);
 	sidebar->set_h_size_flags(p_side_by_side?Control::SIZE_EXPAND_FILL:Control::SIZE_FILL);
 	sidebar->set_stretch_ratio(p_side_by_side?2.0:1.0);
@@ -47,6 +47,7 @@ void SkeletonWorkspaceDocking::configure_base_layout(bool p_side_by_side) {
 	sheet->set_stretch_ratio(p_side_by_side?.57:1.3);
 	workspace_tabs[3]->set_stretch_ratio(1.05);
 	workspace_tabs[4]->set_stretch_ratio(1.0);
+	workspace_tabs[4]->set_custom_minimum_size(Size2(p_side_by_side?360:160,120)*EDSCALE);
 }
 
 void SkeletonWorkspaceDocking::register_tabs(TabContainer *p_tabs) {

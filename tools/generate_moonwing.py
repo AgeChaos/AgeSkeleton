@@ -171,7 +171,7 @@ def generate(output):
                   "source": "Vector paths, joint layout, skin weights and periodic motion authored in this generator; no imported third-party character, rig or motion data.",
                   "bones": len(bones), "attachments": len(layers), "animations": ["Soar", "Glide"]}
     (output / "provenance.json").write_text(json.dumps(provenance, ensure_ascii=False, indent=2)+"\n", encoding="utf-8")
-    (output / "LICENSE.txt").write_text((Path(__file__).resolve().parents[1]/"LICENSE.txt").read_text(encoding="utf-8"), encoding="utf-8")
+    (output / "LICENSE.txt").write_text((Path(__file__).resolve().parents[1]/"samples/moonwing/LICENSE.txt").read_text(encoding="utf-8"), encoding="utf-8")
     print(f"Created {output}: {len(bones)} bones, {len(layers)} skinned attachments, 2 animations")
 
 

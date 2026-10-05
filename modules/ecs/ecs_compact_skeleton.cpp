@@ -45,6 +45,9 @@ Array ecs_pack_skeleton_entities(const Array &input) {
         Dictionary part=data[i];
         for(const Variant &key:part.keys()) {
             String k=key;
+            // Captured ECS scenes include an empty custom-component dictionary.
+            // It carries no gameplay state and is safe to omit from skeleton data.
+            if(k=="components" && part[key].get_type()==Variant::DICTIONARY && Dictionary(part[key]).is_empty()) {part.erase(key);continue;}
             if(!PackedStringArray({"name","position","rotation","scale","shear","parent","active","bone_2d","polygon_2d","skeleton_2d","animation","ecs_uid","_ecs_uid"}).has(k)) return Array();
             if(i>0 && (k=="skeleton_2d" || k=="animation")) return Array();
         }

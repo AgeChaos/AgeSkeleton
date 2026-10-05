@@ -1,23 +1,93 @@
-MIT License
-
+AgeSkeleton Free Use and Restricted Commercialization License 1.0
+SPDX-License-Identifier: LicenseRef-AgeSkeleton-Free-RestrictedCommercial-1.0
+Effective for this revision: 2026-10-05
 Copyright (c) 2026 AgeSkeleton contributors
-Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md).
-Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+1. Scope
+This license covers only original AgeSkeleton editor, runtime, integration,
+tooling and icon contributions whose copyright holders authorize this license
+(the Covered Software). Godot, godot-cpp, third-party libraries, separately
+licensed sample artwork and contributions without the necessary authorization
+retain their own licenses. See THIRD_PARTY_NOTICES.md and bundled notices.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+2. Free use and private development
+You may use, inspect, copy, modify and build the Covered Software for your own
+use, and privately integrate it into software used solely by you or internally
+within your organization. You do not have to publish source code merely because
+you make or use a private modification. Internal use may support your own work,
+but this permission does not authorize providing the Covered Software or a
+product or service incorporating it commercially to other parties.
+No account, subscription, online license check or export fee is required by
+this license.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+3. Non-commercial sharing
+You may share the Covered Software and derivative versions solely for
+non-commercial purposes. Retain this license and all applicable copyright and
+third-party notices, clearly identify modifications, and license the Covered
+Software portions under these same restrictions. You may not grant permissions
+that override these restrictions. Publishing source code does not grant any
+additional commercial rights.
+
+4. Prohibited external commercialization
+Without a separate written license from the relevant copyright holders, you
+may not commercially distribute, sell, rent, license or provide to others the
+Covered Software, a derivative version, or a product or service incorporating
+it, whether source code is disclosed or not. This includes commercial games,
+applications, plug-ins, SDKs, engines and hosted services integrating an
+AgeSkeleton runtime, even when the runtime is unmodified or free of charge.
+External commercial purposes include sales, subscriptions, paid access,
+advertising, in-app purchases, paid custom development or delivery for clients,
+and distribution or services primarily directed toward monetary compensation
+or commercial advantage. Free download or source disclosure does not create
+an exception. The private/internal use expressly permitted in section 2 and
+independent output described in section 5 remain permitted.
+
+5. Independent creative output
+Your independently created images, animations and other artwork are not
+Covered Software merely because they were created or exported with this
+software, including a privately modified editor. You may use and distribute
+such output commercially, subject to any third-party asset rights. This
+exception does not cover editor or runtime code, libraries or binaries copied
+or included in an exported product. A commercial product that integrates an
+AgeSkeleton runtime remains subject to section 4.
+
+6. Reserved rights and prior grants
+All rights not expressly granted are reserved. No trademark endorsement is
+granted. This is a source-available license with commercial restrictions, not
+the MIT license or an OSI-approved open-source license. It applies to this
+revision and later revisions bearing it and does not revoke rights already
+granted for copies previously distributed under MIT or other licenses.
+Third-party permissions cannot be restricted by this license.
+
+7. Termination and disclaimer
+Permissions under this license terminate upon violation. Independently
+granted third-party rights are unaffected.
+THE COVERED SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE AND NONINFRINGEMENT. TO THE EXTENT PERMITTED BY APPLICABLE LAW, THE
+COPYRIGHT HOLDERS ARE NOT LIABLE FOR CLAIMS, DAMAGES OR OTHER LIABILITY
+ARISING FROM THE SOFTWARE OR ITS USE.
+
+中文说明（与英文条款冲突时，以英文条款为准）
+
+1. 范围：仅适用于有权按本许可授权的 AgeSkeleton 原创编辑器、运行库、
+   接入代码、工具和图标。第三方代码及另行许可的素材遵循各自许可证。
+2. 免费使用与自行开发：允许免费使用、学习、复制、修改、编译，以及
+   为自己或本组织内部使用进行集成；无须仅因自行修改、内部使用而公开
+   源代码。内部使用可以服务于自身工作，但不因此取得向第三方提供商业
+   产品或服务的权利。不要求登录、订阅、在线授权或导出付费。
+3. 非商业分享：允许非商业分享原版或修改版，须保留本许可和版权声明、
+   标明修改，受许可代码继续遵守同样限制。公开源码不额外赋予商业权利。
+4. 禁止对外商用：未经相关权利人另行书面授权，无论是否公开源码，均不得
+   对外商业发行、销售、出租、收费授权本软件或衍生版本，也不得对外商业
+   提供集成本软件的产品或服务，包括集成未修改运行库的商业游戏。
+   对外收费、订阅、广告、内购、收费定制或交付及主要面向商业利益的分发
+   或服务均受此限制；免费下载或开源不构成豁免。第 2 条允许的内部使用
+   和第 5 条的独立创作成果不受此项禁止影响。
+5. 创作成果：独立制作的图片、动画等作品，不因使用本软件或自行修改的
+   编辑器而受到本软件许可限制，可以商用，但须尊重素材的第三方权利。
+   此项豁免不包含随产品集成的编辑器或运行库代码、库文件和二进制。
+6. 既有授权：不撤销已按 MIT 或其他许可证分发的旧版本既有授权；不限制
+   第三方独立授权。这是限制对外商用的源码可用许可，不是 MIT／OSI 开源许可。
+7. 违约时本许可授权终止。软件按现状提供，不作担保；在法律允许范围内，
+   权利人不承担使用责任。第三方独立授予的权利不受影响。

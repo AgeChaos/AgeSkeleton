@@ -264,6 +264,20 @@ Vector2 ECSUICanvasEditor::selected_pivot() {
 	Rect2 rect = get_selected_rect();
 	return rect.position + rect.size * pivot;
 }
+bool ECSUICanvasEditor::frame_selected_attachment() {
+    if(!skeleton_authoring || preview.is_null() || selected<0 || selected>=ids.size()) { return false; }
+    PackedVector2Array points=preview->get_deformed_polygon_2d(ids[selected]);
+    if(points.is_empty()) { return false; }
+    Rect2 bounds(points[0],Vector2());
+    for(const Vector2 &point:points) { if(!point.is_finite()) { return false; } bounds.expand_to(point); }
+    finish_drag(false);
+    Vector2 available(MAX(1.0f,get_size().x-100*EDSCALE),MAX(1.0f,get_size().y-140*EDSCALE));
+    zoom=CLAMP(MIN(available.x/MAX(1.0f,bounds.size.x),available.y/MAX(1.0f,bounds.size.y)),.25f,16.0f);
+    pan=Vector2(50,35)*EDSCALE+available*.5f-bounds.get_center()*zoom;
+    center_origin_pending=false;
+    queue_redraw();
+    return true;
+}
 void ECSUICanvasEditor::fit_canvas() {
 	finish_drag(false);
 	if(skeleton_authoring && preview.is_valid()) {
@@ -381,6 +395,24 @@ void ECSUICanvasEditor::_notification(int what) {
 		const Vector2 caption(MAX(22.0f * EDSCALE, pan.x + 5 * EDSCALE), MIN(get_size().y - 5 * EDSCALE, MAX(60.0f * EDSCALE, canvas_rect.get_end().y + 18 * EDSCALE)));
 		draw_string(canvas_font, caption, vformat(String(U"%d × %d px"), int(canvas_size.x), int(canvas_size.y)), HORIZONTAL_ALIGNMENT_LEFT, -1, canvas_font_size, get_theme_color("font_color", "Editor"));
 		}
+        // Show the selected mesh in its evaluated pose, independently of the transform tool.
+        // Boundary edges omit interior triangulation; hidden/inactive variants stay hidden.
+        if(skeleton_authoring && show_images && selected>=0 && selected<ids.size() && !authoring_hidden.has(selected) && preview->is_active_in_hierarchy(ids[selected]) && preview->is_skeleton_attachment_visible(ids[selected])) {
+            Dictionary mesh=preview->get_polygon_2d(ids[selected]);
+            PackedVector2Array points=preview->get_deformed_polygon_2d(ids[selected]);
+            PackedInt32Array triangles=mesh.get("triangles",PackedInt32Array());
+            if(triangles.is_empty()) { triangles=Geometry2D::triangulate_polygon(PackedVector2Array(mesh.get("polygon",PackedVector2Array()))); }
+            HashMap<uint64_t,int> edges;
+            for(int t=0;t+2<triangles.size();t+=3) { for(int j=0;j<3;j++) {
+                int a=triangles[t+j],b=triangles[t+(j+1)%3];
+                if(a<0 || b<0 || a>=points.size() || b>=points.size()) { continue; }
+                uint64_t key=(uint64_t(MIN(a,b))<<32)|uint32_t(MAX(a,b));
+                int *count=edges.getptr(key); if(count) { ++*count; } else { edges.insert(key,1); }
+            } }
+            for(const KeyValue<uint64_t,int> &edge:edges) { if(edge.value==1) {
+                draw_line(points[int(edge.key>>32)]*scale+pan,points[int(uint32_t(edge.key))]*scale+pan,get_theme_color("accent_color","Editor"),2*EDSCALE,true);
+            } }
+        }
 		if (selected >= 0 && !authoring_locked.has(selected) && !authoring_hidden.has(selected) && selected < ids.size() && (!preview->get_ui(ids[selected]).is_empty() || !preview->get_bone_2d(ids[selected]).is_empty() || !preview->get_polygon_2d(ids[selected]).is_empty() || !preview->get_skeleton_2d(ids[selected]).is_empty())) {
 			const bool is_ui = !preview->get_ui(ids[selected]).is_empty();
 			Rect2 rect = get_selected_rect();

@@ -1,0 +1,8 @@
+config_version=5
+[application]
+config/name="Wayfarer Wardrobe"
+run/main_loop_type="ECSMainLoop"
+[ecs]
+run/scene="res://Assets/Wayfarer.ecsrig.tres"
+[rendering]
+renderer/rendering_method="gl_compatibility"

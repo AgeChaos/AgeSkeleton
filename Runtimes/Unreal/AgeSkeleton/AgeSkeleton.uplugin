@@ -1,0 +1,6 @@
+{
+  "FileVersion":3,"Version":3,"VersionName":"0.3.0","FriendlyName":"AgeSkeleton Runtime",
+  "Description":"Sampled mesh animation playback with Blueprint controls.","Category":"Animation","CanContainContent":true,
+  "Modules":[{"Name":"AgeSkeleton","Type":"Runtime","LoadingPhase":"Default"}],
+  "Plugins":[{"Name":"ProceduralMeshComponent","Enabled":true}]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "com.ageskeleton.runtime",
+  "version": "0.3.0",
+  "displayName": "AgeSkeleton Runtime",
+  "description": "Portable sampled mesh animation playback for AgeSkeleton.",
+  "unity": "2022.3",
+  "license": "SEE LICENSE IN LICENSE",
+  "samples": [{"displayName":"Runtime demo","description":"Create a sample scene from exported data.","path":"Samples~/Demo"}]
+}
