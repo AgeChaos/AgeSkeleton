@@ -37,6 +37,9 @@ export class AgeSkeletonPlayer extends Component {
         if(this.initialAnimation)next.play(this.initialAnimation);this.apply();
     }
     update(dt:number):void {if(this.runtime){this.runtime.update(dt);this.apply();const events=this.runtime.events.slice();for(const event of events){if(!this.isValid)break;this.node.emit("ageskeleton-event",event);}}}
+    crossFade(name:string,duration=.2,restart=true):void{this.runtime!.crossFade(name,duration,restart);this.apply();}
+    get isBlending():boolean{return this.runtime?.isBlending??false;}
+    get blendProgress():number{return this.runtime?.blendProgress??1;}
     play(name:string):void {this.runtime!.play(name);this.apply();}
     pause():void {this.runtime!.playing=false;}
     resume():void {this.runtime!.playing=true;}

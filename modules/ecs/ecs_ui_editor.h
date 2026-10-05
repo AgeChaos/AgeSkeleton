@@ -44,7 +44,6 @@ class ECSUICanvasEditor : public Control {
 	bool bone_drag = false;
 	Callable setup_pose_callback;
 	Array setup_pose_after;
-	void preview_setup_pose(const Array &p_entities);
 	bool runtime_preview = false;
 	Vector3 bone_drag_value;
 	Vector2 bone_drag_origin;
@@ -61,10 +60,13 @@ class ECSUICanvasEditor : public Control {
 	bool panning = false;
 	bool grid_visible = true;
 	bool skeleton_authoring=false, keyframe_edit_mode=false, center_origin_pending=false;
-	bool mesh_edit_mode=false;
+	bool mesh_edit_mode=false, mesh_preserve_texture=true;
 	int mesh_vertex=-1;
 	Dictionary mesh_before,mesh_work;
-	Transform2D mesh_vertex_transform(int p_vertex) const;
+	PackedVector2Array mesh_display_before;
+	Vector2 mesh_grab_offset;
+	static Dictionary remap_mesh_vertex(const Dictionary &p_mesh,const PackedVector2Array &p_displayed,int p_vertex,const Vector2 &p_position);
+	Transform2D mesh_vertex_transform(int p_vertex,const Dictionary &p_mesh=Dictionary()) const;
 	void finish_mesh(bool p_commit);
 	void edit_mesh_topology(const Vector2 &p_position,bool p_remove);
 	int weight_bone=-1;
@@ -85,12 +87,15 @@ protected:
 	void _notification(int p_what);
 
 public:
+	// Shared by canvas drags and inspector scrubbing; leaves the source scene untouched.
+	void preview_setup_pose(const Array &p_entities);
     void set_authoring_item_state(int p_index,bool p_hidden,bool p_locked);
     bool is_authoring_hidden(int p_index) const { return authoring_hidden.has(p_index); }
     bool is_authoring_locked(int p_index) const { return authoring_locked.has(p_index); }
 	void set_setup_pose_callback(const Callable &p_callback) { setup_pose_callback=p_callback; }
 	void configure_tilemap_brush(int p_source,Vector2i p_atlas,int p_alternative=0) { finish_tilemap(false); tilemap_source=p_source; tilemap_atlas=p_atlas; tilemap_alternative=p_alternative; }
 	Vector2 get_canvas_mouse_position() const { return (get_local_mouse_position()-pan)/display_scale(); }
+	void set_mesh_preserve_texture(bool p_enabled) { finish_mesh(false); mesh_preserve_texture=p_enabled; }
 	void set_mesh_edit_mode(bool p_enabled) { finish_mesh(false); mesh_edit_mode=p_enabled; queue_redraw(); }
 	void configure_weight_brush(int p_bone,float p_radius,float p_strength) { finish_paint(false); weight_bone=p_bone; weight_radius=p_radius; weight_strength=p_strength; queue_redraw(); }
 	static Dictionary paint_weights(const Dictionary &p_polygon,const Transform3D &p_transform,const Vector2 &p_center,float p_radius,int p_bone,float p_strength);

@@ -41,6 +41,9 @@ public:
     UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="AgeSkeleton",meta=(ClampMin="0.001")) float PixelsPerCentimeter=1;
     UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="AgeSkeleton") FString InitialAnimation;
     UFUNCTION(BlueprintCallable,Category="AgeSkeleton") bool LoadFile(const FString &Path);
+    UFUNCTION(BlueprintCallable,Category="AgeSkeleton") bool CrossFade(const FString &Animation,float Duration=0.2f,bool Restart=true);
+    UFUNCTION(BlueprintPure,Category="AgeSkeleton") bool IsBlending()const;
+    UFUNCTION(BlueprintPure,Category="AgeSkeleton") float GetBlendProgress()const;
     UFUNCTION(BlueprintCallable,Category="AgeSkeleton") bool Play(const FString &Animation);
     UFUNCTION(BlueprintCallable,Category="AgeSkeleton") void Pause();
     UFUNCTION(BlueprintCallable,Category="AgeSkeleton") void Resume();

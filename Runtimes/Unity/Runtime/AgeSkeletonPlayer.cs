@@ -65,6 +65,9 @@ namespace AgeSkeleton {
         public void SetIKTarget(string bone,float x,float y,int chainLength=2,float mix=1,int iterations=24,float tolerance=.1f){Runtime.SetIKTarget(bone,x,y,chainLength,mix,iterations,tolerance);Apply();}
         public void ClearIKTarget(string bone){Runtime.ClearIKTarget(bone);Apply();}
         public Vector2 GetBoneTip(string bone){Runtime.GetBoneTip(bone,out float x,out float y);return new Vector2(x,y);}
+        public void CrossFade(string clip,float duration=.2f,bool restart=true){Runtime.CrossFade(clip,duration,restart);Apply();}
+        public bool IsBlending=>Runtime!=null&&Runtime.IsBlending;
+        public float BlendProgress=>Runtime?.BlendProgress??1;
         public void Play(string clip){Runtime.Play(clip);Apply();}public void Pause(){Runtime.Playing=false;}public void Resume(){Runtime.Playing=true;}
         public void Stop(){Runtime.Stop();Apply();}public void Seek(float t){Runtime.Seek(t);Apply();}
         public void SetSkin(string s){Runtime.SetSkin(s);Apply();}public void SetWardrobe(string g,string s){Runtime.SetWardrobe(g,s);Apply();}

@@ -18,6 +18,7 @@ class ConfirmationDialog;
 class ECSAnimationCurve;
 class MenuButton;
 class ColorPickerButton;
+class ScrollContainer;
 class ECSAnimationEditor : public VBoxContainer {
 	GDCLASS(ECSAnimationEditor,VBoxContainer);
 	friend class ECSAnimationTimeline;
@@ -132,6 +133,17 @@ class ECSAnimationEditor : public VBoxContainer {
 	void canvas_value_changed(double p_value,int p_field,int p_axis);
 	void refresh_canvas_values();
 	void refresh_selection_properties();
+	enum InspectorContext { INSPECT_RIG=1, INSPECT_BONE=2, INSPECT_IMAGE=4, INSPECT_SLOT=8, INSPECT_SKIN=16, INSPECT_SKINS=32, INSPECT_PLACEHOLDER=64, INSPECT_ANIMATION=128, INSPECT_EVENT=256 };
+	Dictionary inspector_selection;
+	Vector<Control *> contextual_controls;
+	Control *slot_property_panel=nullptr;
+    ScrollContainer *property_scroll=nullptr;
+    Control *event_property_panel=nullptr,*curve_property_panel=nullptr;
+	void contextual_control(Control *p_control,int p_contexts,bool p_setup_only=false,bool p_animation_only=false);
+	int inspector_context() const;
+	void refresh_inspector_context();
+	void select_inspector_item(const Dictionary &p_metadata);
+	bool run_inspector_self_test();
 	void selection_property_changed();
 	LineEdit *selection_name=nullptr;
 	SpinBox *selection_length=nullptr;
@@ -142,6 +154,9 @@ class ECSAnimationEditor : public VBoxContainer {
 	Button *canvas_tools[4]={};
 	int active_canvas_tool=1;
 	bool refreshing_canvas=false;
+    bool canvas_scrubbing=false;
+    void canvas_scrub_started();
+    void canvas_scrub_finished(bool p_cancelled);
 	SpinBox *frame=nullptr,*loop_start=nullptr,*loop_end=nullptr;
 	Button *auto_key=nullptr,*loop_playback=nullptr;
 	Button *transform_tools[3]={};
@@ -191,7 +206,15 @@ class ECSAnimationEditor : public VBoxContainer {
 	ConfirmationDialog *binding_dialog=nullptr;
 	ItemList *binding_bones=nullptr;
 	int binding_rig=-1;
+	ConfirmationDialog *contour_dialog=nullptr;
+    SpinBox *contour_threshold=nullptr,*contour_precision=nullptr,*contour_margin=nullptr;
+    Ref<ECSScene> contour_scene;
+    int contour_entity=-1;
+    void confirm_auto_contour();
+    bool generate_auto_contour(int entity,float threshold,float precision,int margin,String &error);
 	CheckBox *mesh_edit=nullptr;
+	OptionButton *mesh_edit_behavior=nullptr;
+	void mesh_behavior_selected(int p_mode);
 	HBoxContainer *image_tools=nullptr;
 	void image_action(int p_action);
 	void images_dropped(const PackedStringArray &p_paths,const Vector2 &p_position);
@@ -242,6 +265,7 @@ protected:
 public:
 	ECSAnimationEditor();
 	bool run_self_test();
+	void open_document(const String &path);
 	void start_independent_project(const Ref<ECSScene> &p_scene);
 	bool prepare_platform_export();
 	void stop_preview();

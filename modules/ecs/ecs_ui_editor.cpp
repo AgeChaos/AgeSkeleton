@@ -325,6 +325,7 @@ void ECSUICanvasEditor::_notification(int what) {
 		queue_redraw();
 	}
 	if (what == NOTIFICATION_VISIBILITY_CHANGED && !is_visible_in_tree()) {
+		finish_mesh(false);
 		creating_bone=false;
 		finish_paint(false);
 		finish_drag(false);
@@ -412,6 +413,14 @@ void ECSUICanvasEditor::_notification(int what) {
             for(const KeyValue<uint64_t,int> &edge:edges) { if(edge.value==1) {
                 draw_line(points[int(edge.key>>32)]*scale+pan,points[int(uint32_t(edge.key))]*scale+pan,get_theme_color("accent_color","Editor"),2*EDSCALE,true);
             } }
+            // Selection keeps a fixed-size origin marker even outside transform tools.
+            if(!points.is_empty() && tool_mode!=1 && tool_mode!=2 && tool_mode!=3 && tool_mode!=5) {
+                Vector2 origin=selected_pivot()*scale+pan;
+                for(Vector2 axis:{Vector2(1,0),Vector2(0,1)}) {
+                    draw_line(origin-axis*6*EDSCALE,origin+axis*6*EDSCALE,Color(0,0,0,.8),3*EDSCALE,true);
+                    draw_line(origin-axis*6*EDSCALE,origin+axis*6*EDSCALE,Color(.95,.95,.95),EDSCALE,true);
+                }
+            }
         }
 		if (selected >= 0 && !authoring_locked.has(selected) && !authoring_hidden.has(selected) && selected < ids.size() && (!preview->get_ui(ids[selected]).is_empty() || !preview->get_bone_2d(ids[selected]).is_empty() || !preview->get_polygon_2d(ids[selected]).is_empty() || !preview->get_skeleton_2d(ids[selected]).is_empty())) {
 			const bool is_ui = !preview->get_ui(ids[selected]).is_empty();
@@ -729,7 +738,81 @@ void ECSUICanvasEditor::edit_mesh_topology(const Vector2 &position,bool remove) 
 	mesh["polygon"]=points; mesh["uv"]=uv; mesh["triangles"]=triangles; if(!weights.is_empty()) { mesh["bones"]=bones; mesh["weights"]=weights; }
 	emit_signal("mesh_edited",selected,mesh);
 }
+Dictionary ECSUICanvasEditor::remap_mesh_vertex(const Dictionary &mesh,const PackedVector2Array &displayed,int vertex,const Vector2 &position) {
+    PackedVector2Array points=mesh.get("polygon",PackedVector2Array()),uv=mesh.get("uv",PackedVector2Array());
+    if(vertex<0 || vertex>=points.size() || displayed.size()!=points.size() || !position.is_finite()) { return Dictionary(); }
+    PackedInt32Array triangles=mesh.get("triangles",PackedInt32Array());
+    if(triangles.is_empty()) { triangles=Geometry2D::triangulate_polygon(points); }
+    // Use the mouse-down snapshot for every motion: no cumulative UV or weight drift.
+    int chosen=-1; real_t best=1e30; Vector3 bary;
+    for(int t=0;t+2<triangles.size();t+=3) {
+        int a=triangles[t],b=triangles[t+1],c=triangles[t+2];
+        if(a<0 || b<0 || c<0 || a>=points.size() || b>=points.size() || c>=points.size()) { return Dictionary(); }
+        const Vector2 pa=displayed[a],pb=displayed[b],pc=displayed[c];
+        real_t determinant=(pb-pa).cross(pc-pa);
+        if(Math::abs(determinant)<.000001) { continue; }
+        // Do not allow adjusting the topology to fold a triangle over its neighbour.
+        if(a==vertex || b==vertex || c==vertex) {
+            Vector2 na=a==vertex?position:pa,nb=b==vertex?position:pb,nc=c==vertex?position:pc;
+            if((nb-na).cross(nc-na)/determinant<.0001) { return Dictionary(); }
+        }
+        real_t y=(position-pa).cross(pc-pa)/determinant,z=(pb-pa).cross(position-pa)/determinant;
+        Vector3 candidate(1-y-z,y,z);
+        real_t distance=0;
+        if(candidate.x<0 || candidate.y<0 || candidate.z<0) {
+            distance=1e30;
+            Vector2 corners[3]={pa,pb,pc};
+            for(int edge=0;edge<3;edge++) { Vector2 segment[2]={corners[edge],corners[(edge+1)%3]}; distance=MIN(distance,Geometry2D::get_closest_point_to_segment(position,segment).distance_squared_to(position)); }
+        }
+        if(distance<best) { best=distance; chosen=t; bary=candidate; }
+    }
+    if(chosen<0) { return Dictionary(); }
+    int vertices[3]={triangles[chosen],triangles[chosen+1],triangles[chosen+2]};
+    Dictionary result=mesh.duplicate(true);
+    if(!uv.is_empty()) {
+        if(uv.size()!=points.size()) { return Dictionary(); }
+        Vector2 coordinate=uv[vertices[0]]*bary.x+uv[vertices[1]]*bary.y+uv[vertices[2]]*bary.z;
+        if(!coordinate.is_finite()) { return Dictionary(); }
+        bool normalized=true; for(const Vector2 &point:uv) { normalized &= point.x>=0 && point.x<=1 && point.y>=0 && point.y<=1; }
+        if(normalized && (coordinate.x<-.00001 || coordinate.x>1.00001 || coordinate.y<-.00001 || coordinate.y>1.00001)) { return Dictionary(); }
+        if(normalized) { coordinate=coordinate.clamp(Vector2(),Vector2(1,1)); }
+        uv.set(vertex,coordinate); result["uv"]=uv;
+    }
+    PackedInt32Array bones=mesh.get("bones",PackedInt32Array()); PackedFloat32Array weights=mesh.get("weights",PackedFloat32Array());
+    if(!weights.is_empty()) {
+        if(weights.size()!=points.size()*4 || bones.size()!=weights.size()) { return Dictionary(); }
+        // Outside the old contour, extend the nearest edge's influences without negative weights.
+        Vector3 blend(MAX(real_t(0),bary.x),MAX(real_t(0),bary.y),MAX(real_t(0),bary.z));
+        blend/=blend.x+blend.y+blend.z;
+        HashMap<int,real_t> influences;
+        for(int k=0;k<3;k++) { for(int j=0;j<4;j++) { int offset=vertices[k]*4+j; influences[bones[offset]]+=weights[offset]*blend[k]; } }
+        int chosen_bones[4]={0,0,0,0}; real_t chosen_weights[4]={0,0,0,0};
+        for(const KeyValue<int,real_t> &entry:influences) { for(int j=0;j<4;j++) { if(entry.value>chosen_weights[j]) { for(int k=3;k>j;k--) { chosen_weights[k]=chosen_weights[k-1]; chosen_bones[k]=chosen_bones[k-1]; } chosen_weights[j]=entry.value; chosen_bones[j]=entry.key; break; } } }
+        real_t sum=chosen_weights[0]+chosen_weights[1]+chosen_weights[2]+chosen_weights[3];
+        if(sum<=0) { return Dictionary(); }
+        for(int j=0;j<4;j++) { bones.set(vertex*4+j,chosen_bones[j]); weights.set(vertex*4+j,chosen_weights[j]/sum); }
+        result["bones"]=bones; result["weights"]=weights;
+    }
+    return result;
+}
 bool ECSUICanvasEditor::run_mesh_edit_self_test(const Ref<ECSScene> &value) {
+    // An affine texture mapping must remain fixed when an interior point moves.
+    Dictionary fixture; PackedVector2Array plane({Vector2(0,0),Vector2(10,0),Vector2(10,10),Vector2(0,10),Vector2(5,5)});
+    PackedVector2Array texcoords; for(const Vector2 &point:plane) { texcoords.push_back(point/10); }
+    fixture["polygon"]=plane; fixture["uv"]=texcoords; fixture["triangles"]=PackedInt32Array({0,1,4,1,2,4,2,3,4,3,0,4});
+    PackedInt32Array bone_ids; PackedFloat32Array influences;
+    for(const Vector2 &point:plane) { for(int j=0;j<4;j++) { bone_ids.push_back(j==1?1:0); influences.push_back(j==0?1-point.x/10:j==1?point.x/10:0); } }
+    fixture["bones"]=bone_ids; fixture["weights"]=influences;
+    Transform2D screen(Vector2(-2,.4),Vector2(.3,1.5),Vector2(30,-40));
+    PackedVector2Array displayed; for(const Vector2 &point:plane) { displayed.push_back(screen.xform(point)); }
+    Dictionary mapped=remap_mesh_vertex(fixture,displayed,4,screen.xform(Vector2(6,4)));
+    if(mapped.is_empty() || !PackedVector2Array(mapped["uv"])[4].is_equal_approx(Vector2(.6,.4))) { ERR_PRINT("Mesh texture remap failed"); return false; }
+    PackedInt32Array mapped_bones=mapped["bones"]; PackedFloat32Array mapped_weights=mapped["weights"]; real_t right_weight=0,sum=0;
+    for(int j=0;j<4;j++) { sum+=mapped_weights[16+j]; if(mapped_bones[16+j]==1) { right_weight+=mapped_weights[16+j]; } }
+    if(!Math::is_equal_approx(right_weight,real_t(.6)) || !Math::is_equal_approx(sum,real_t(1)) || PackedVector2Array(fixture["uv"])!=texcoords) { ERR_PRINT("Mesh influence interpolation failed"); return false; }
+    if(!remap_mesh_vertex(fixture,displayed,4,screen.xform(Vector2(20,20))).is_empty()) { ERR_PRINT("Mesh fold was accepted"); return false; }
+    // Keep the original event workflow regression for the explicit deformation mode.
+    set_mesh_preserve_texture(false);
 	edit_scene(value,3); set_mesh_edit_mode(true); set_keyframe_edit_mode(false); configure_weight_brush(-1,60,.15);
 	Dictionary before=Dictionary(value->get_entities()[3])["polygon_2d"]; PackedVector2Array original=before["polygon"]; Vector2 at=preview->get_deformed_polygon_2d(ids[3])[0]*display_scale()+pan;
 	auto click=[&](bool pressed) { Ref<InputEventMouseButton> event; event.instantiate(); event->set_button_index(MouseButton::LEFT); event->set_pressed(pressed); event->set_position(at); gui_input(event); };
@@ -742,13 +825,41 @@ bool ECSUICanvasEditor::run_mesh_edit_self_test(const Ref<ECSScene> &value) {
 	PackedVector2Array display=preview->get_deformed_polygon_2d(ids[3]); Vector2 center=(display[faces[0]]+display[faces[1]]+display[faces[2]])/3*display_scale()+pan;
 	edit_mesh_topology(center,false); ok &= PackedVector2Array(Dictionary(Dictionary(value->get_entities()[3])["polygon_2d"])["polygon"]).size()==original.size()+1 && value->instantiate().is_valid();
 	edit_mesh_topology(center,true); ok &= PackedVector2Array(Dictionary(Dictionary(value->get_entities()[3])["polygon_2d"])["polygon"]).size()==original.size() && value->instantiate().is_valid();
-	set_mesh_edit_mode(false); return ok;
+	print_line(String("MESH_DEFORM_CHECK ")+(ok?"pass":"fail"));
+    set_mesh_preserve_texture(true);
+    // Exercise UV/weight updates and cancellation through real canvas input on a bound mesh.
+    edit_scene(value,3);
+    Dictionary adjusted_before=Dictionary(value->get_entities()[3])["polygon_2d"],preview_before=preview->get_polygon_2d(ids[3]);
+    PackedVector2Array old_display=preview->get_deformed_polygon_2d(ids[3]);
+    PackedInt32Array adjacent=adjusted_before.get("triangles",PackedInt32Array());
+    if(adjacent.is_empty()) { adjacent=Geometry2D::triangulate_polygon(PackedVector2Array(adjusted_before["polygon"])); }
+    int picked=adjacent[0]; Vector2 start=old_display[picked];
+    Vector2 destination=start.lerp((old_display[adjacent[0]]+old_display[adjacent[1]]+old_display[adjacent[2]])/3,.05);
+    auto press=[&](bool down) { Ref<InputEventMouseButton> e; e.instantiate(); e->set_button_index(MouseButton::LEFT); e->set_pressed(down); e->set_position(start*display_scale()+pan); gui_input(e); };
+    press(true); motion->set_position(destination*display_scale()+pan); gui_input(motion);
+    print_line("MESH_DRAG_CHECK actual="+String(preview->get_deformed_polygon_2d(ids[3])[picked])+" desired="+String(destination));
+    ok &= preview->get_deformed_polygon_2d(ids[3])[picked].is_equal_approx(destination);
+    gui_input(cancel); press(false);
+    Dictionary restored=preview->get_polygon_2d(ids[3]);
+    for(const char *field:{"polygon","uv","bones","weights"}) { ok &= restored.get(field,Variant())==preview_before.get(field,Variant()); }
+    press(true); gui_input(motion); press(false);
+    Dictionary committed=Dictionary(value->get_entities()[3])["polygon_2d"];
+    print_line(String("MESH_COMMIT_CHECK ")+(committed!=adjusted_before?"changed":"unchanged"));
+    ok &= committed!=adjusted_before && value->instantiate().is_valid();
+    ok &= EditorUndoRedoManager::get_singleton()->undo();
+    ok &= Dictionary(Dictionary(value->get_entities()[3])["polygon_2d"])==adjusted_before;
+    ok &= EditorUndoRedoManager::get_singleton()->redo();
+    ok &= Dictionary(Dictionary(value->get_entities()[3])["polygon_2d"])==committed;
+    ok &= EditorUndoRedoManager::get_singleton()->undo();
+    set_mesh_edit_mode(false);
+    print_line(ok?"ECS_MESH_ADJUST_PASS uv weights reflected_transform drag cancel undo redo deform":"ECS_MESH_ADJUST_FAIL");
+    return ok;
 }
-Transform2D ECSUICanvasEditor::mesh_vertex_transform(int vertex) const {
+Transform2D ECSUICanvasEditor::mesh_vertex_transform(int vertex,const Dictionary &definition) const {
 	Transform3D global=preview->get_global_transform(ids[selected]);
 	Transform2D base(Vector2(global.basis[0][0],global.basis[1][0]),Vector2(global.basis[0][1],global.basis[1][1]),Vector2(global.origin.x,global.origin.y));
 	Dictionary mesh=preview->get_polygon_2d(ids[selected]); int64_t rig_id=mesh.get("skeleton",int64_t(0)); if(!rig_id) { return base; }
-	Dictionary rig=preview->get_skeleton_2d(rig_id); PackedInt64Array bones=rig["bones"]; Array poses=rig["bind_poses"]; PackedInt32Array indices=mesh["bones"]; PackedFloat32Array weights=mesh["weights"];
+	Dictionary rig=preview->get_skeleton_2d(rig_id); PackedInt64Array bones=rig["bones"]; Array poses=rig["bind_poses"]; PackedInt32Array indices=definition.is_empty()?PackedInt32Array(mesh["bones"]):PackedInt32Array(definition["bones"]); PackedFloat32Array weights=definition.is_empty()?PackedFloat32Array(mesh["weights"]):PackedFloat32Array(definition["weights"]);
 	Transform2D blended{Vector2(),Vector2(),Vector2()};
 	for(int j=0;j<4;j++) { int index=indices[vertex*4+j]; Transform3D bone=preview->get_global_transform(bones[index]); Transform2D current(Vector2(bone.basis[0][0],bone.basis[1][0]),Vector2(bone.basis[0][1],bone.basis[1][1]),Vector2(bone.origin.x,bone.origin.y)); Transform2D skin=current*Transform2D(poses[index]).affine_inverse(); for(int axis=0;axis<3;axis++) { blended[axis]+=skin[axis]*weights[vertex*4+j]; } }
 	Transform3D root=preview->get_global_transform(rig_id); Transform2D root2d(Vector2(root.basis[0][0],root.basis[1][0]),Vector2(root.basis[0][1],root.basis[1][1]),Vector2(root.origin.x,root.origin.y));
@@ -757,7 +868,7 @@ Transform2D ECSUICanvasEditor::mesh_vertex_transform(int vertex) const {
 void ECSUICanvasEditor::finish_mesh(bool commit) {
 	if(mesh_vertex<0) { return; } mesh_vertex=-1;
 	if(commit && mesh_work!=mesh_before) { emit_signal("mesh_edited",selected,mesh_work); }
-	else if(preview.is_valid() && selected>=0 && selected<ids.size()) { Dictionary restore; restore["polygon"]=mesh_before["polygon"]; preview->set_polygon_2d(ids[selected],restore); }
+	else if(preview.is_valid() && selected>=0 && selected<ids.size()) { Dictionary restore; for(const char *field:{"polygon","uv","bones","weights"}) { if(mesh_before.has(field)) { restore[field]=mesh_before[field]; } } preview->set_polygon_2d(ids[selected],restore); }
 	queue_redraw();
 }
 bool ECSUICanvasEditor::can_drop_data(const Point2 &,const Variant &value) const {
@@ -814,13 +925,19 @@ void ECSUICanvasEditor::gui_input(const Ref<InputEvent> &event) {
 			if(!button->is_pressed()) { finish_mesh(true); accept_event(); return; }
 			PackedVector2Array points=preview->get_deformed_polygon_2d(ids[selected]); float nearest=10*EDSCALE;
 			for(int i=0;i<points.size();i++) { float distance=(points[i]*display_scale()+pan).distance_to(button->get_position()); if(distance<nearest) { nearest=distance; mesh_vertex=i; } }
-			if(mesh_vertex>=0) { mesh_before=Dictionary(scene->get_entities()[selected])["polygon_2d"]; mesh_work=mesh_before.duplicate(true); grab_focus(); }
+			if(mesh_vertex>=0) { mesh_before=Dictionary(scene->get_entities()[selected])["polygon_2d"]; mesh_work=mesh_before.duplicate(true); mesh_display_before=points; mesh_grab_offset=points[mesh_vertex]-(button->get_position()-pan)/display_scale(); grab_focus(); }
 			accept_event(); return;
 		}
 		if(motion.is_valid() && mesh_vertex>=0) {
-			Transform2D transform=mesh_vertex_transform(mesh_vertex); if(Math::abs(transform.determinant())<.000001) { return; }
-			PackedVector2Array points=mesh_work["polygon"]; points.set(mesh_vertex,transform.affine_inverse().xform((motion->get_position()-pan)/display_scale())); mesh_work["polygon"]=points;
-			Dictionary update; update["polygon"]=points; preview->set_polygon_2d(ids[selected],update); queue_redraw(); accept_event(); return;
+            const Vector2 destination=(motion->get_position()-pan)/display_scale()+mesh_grab_offset;
+            bool original_position=destination.is_equal_approx(mesh_display_before[mesh_vertex]);
+            Dictionary next=mesh_preserve_texture && !original_position?remap_mesh_vertex(mesh_before,mesh_display_before,mesh_vertex,destination):mesh_before.duplicate(true);
+            if(next.is_empty()) { accept_event(); return; }
+            Transform2D transform=mesh_vertex_transform(mesh_vertex,next); if(Math::abs(transform.determinant())<.000001) { accept_event(); return; }
+            PackedVector2Array points=next["polygon"]; if(!original_position) { points.set(mesh_vertex,transform.affine_inverse().xform(destination)); } next["polygon"]=points;
+            Dictionary update; for(const char *field:{"polygon","uv","bones","weights"}) { if(next.has(field)) { update[field]=next[field]; } }
+            if(preview->set_polygon_2d(ids[selected],update)) { mesh_work=next; }
+            queue_redraw(); accept_event(); return;
 		}
 	}
 	if(skeleton_authoring && !keyframe_edit_mode && weight_bone>=0) {

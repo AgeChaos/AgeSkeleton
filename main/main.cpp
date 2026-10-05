@@ -1125,22 +1125,28 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 	if (skeleton_editor) {
 		editor = true;
 		user_args.push_back("--agechaos-skeleton-editor");
-		if (!args.find("--path")) {
-			const String executable_dir = OS::get_singleton()->get_executable_path().get_base_dir();
-			project_path = executable_dir.path_join("Workspace");
-			const String workspace_config = executable_dir.path_join("workspace.path");
-			if (FileAccess::exists(workspace_config)) {
-				const String workspace_path = FileAccess::get_file_as_string(workspace_config).strip_edges();
-				if (!workspace_path.is_empty()) {
-					project_path = workspace_path.is_absolute_path() ? workspace_path : executable_dir.path_join(workspace_path).simplify_path();
-				}
-			}
-#ifdef MACOS_ENABLED
-			if (!DirAccess::dir_exists_absolute(project_path)) {
-				project_path = OS::get_singleton()->get_executable_path().get_base_dir().path_join("../Resources/Workspace");
-			}
-#endif
-		}
+        // Document paths are application arguments, never a Godot project directory.
+        for (auto *arg = args.front(); arg;) {
+            auto *next = arg->next();
+            if (arg->get().get_extension().to_lower() == "ageskeleton") {
+                String document = arg->get();
+                if (!document.is_absolute_path()) { document = DirAccess::get_full_path(".", DirAccess::ACCESS_FILESYSTEM).path_join(document); }
+                user_args.push_back("--open-document"); user_args.push_back(document);
+                args.erase(arg);
+            }
+            arg = next;
+        }
+        if (!args.find("--path")) {
+            project_path = OS::get_singleton()->get_data_path().path_join("AgeSkeleton/EditorHost");
+            Error host_error = DirAccess::make_dir_recursive_absolute(project_path);
+            if (host_error != OK) { return host_error; }
+            String host_config = project_path.path_join("project.godot");
+            if (!FileAccess::exists(host_config)) {
+                Ref<FileAccess> config = FileAccess::open(host_config, FileAccess::WRITE);
+                if (config.is_null()) { return ERR_FILE_CANT_WRITE; }
+                config->store_string("config_version=5\n[application]\nconfig/name=\"AgeSkeleton\"\n[rendering]\nrenderer/rendering_method=\"gl_compatibility\"\n");
+            }
+        }
 	}
 #endif
 

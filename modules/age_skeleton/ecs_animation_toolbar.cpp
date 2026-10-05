@@ -1,6 +1,7 @@
 #ifdef TOOLS_ENABLED
 #include "ecs_animation_editor.h"
 #include "ecs_skeleton_icons.h"
+#include "skeleton_scrub_spin_box.h"
 #include "scene/gui/foldable_container.h"
 #include "core/object/callable_mp.h"
 #include "editor/themes/editor_scale.h"
@@ -105,9 +106,13 @@ void ECSAnimationEditor::build_canvas_tools() {
 		auto *label=memnew(Label); label->set_text(TTR(names[row])); label->set_custom_minimum_size(Size2(64,0)*EDSCALE); line->add_child(label);
 		int count=row==0?1:2;
 		for(int axis=0;axis<count;axis++) {
-			auto *value=memnew(SpinBox); value->set_min(-100000); value->set_max(100000); value->set_step(.01);
+			auto *value=memnew(SkeletonScrubSpinBox); value->set_min(-100000); value->set_max(100000); value->set_step(.01);
+            value->set_scrub_sensitivity(row==0?.25:row==1?1.:row==2?.01:.1);
+            value->connect("scrub_started",callable_mp(this,&ECSAnimationEditor::canvas_scrub_started));
+            value->connect("scrub_preview",callable_mp(this,&ECSAnimationEditor::canvas_value_changed).bind(row,axis));
+            value->connect("scrub_finished",callable_mp(this,&ECSAnimationEditor::canvas_scrub_finished));
 			value->set_custom_minimum_size(Size2(64,30)*EDSCALE); value->set_h_size_flags(SIZE_EXPAND_FILL); value->get_line_edit()->set_expand_to_text_length_enabled(false);
-			value->set_tooltip_text(row==0?TTR("Rotation in degrees"):axis==0?"X":"Y"); line->add_child(value);
+			value->set_tooltip_text((row==0?TTR("Rotation in degrees"):axis==0?String("X"):String("Y"))+"\n"+TTR("Drag left or right to adjust. Shift: fine adjustment. Click to type. Esc: cancel drag.")); line->add_child(value);
 			int index=row==0?0:row==1?1+axis:row==2?3+axis:5+axis; canvas_values[index]=value;
 			value->set_name("Value"+itos(index)); value->connect("value_changed",callable_mp(this,&ECSAnimationEditor::canvas_value_changed).bind(row,axis));
 		}
@@ -185,27 +190,101 @@ void ECSAnimationEditor::refresh_canvas_values() {
 	if(animation_mode) { position=local_canvas->get_authoring_vector(entity,"position"); rotation=local_canvas->get_authoring_vector(entity,"rotation"); scale=local_canvas->get_authoring_vector(entity,"scale"); shear=local_canvas->get_authoring_vector(entity,"shear"); }
 	refreshing_canvas=true; double values[]={Math::rad_to_deg(rotation.z),position.x,position.y,scale.x,scale.y,Math::rad_to_deg(shear.x),Math::rad_to_deg(shear.y)}; for(int i=0;i<7;i++) { canvas_values[i]->set_value_no_signal(values[i]); } refreshing_canvas=false;
 }
+void ECSAnimationEditor::canvas_scrub_started() { canvas_scrubbing=true; }
+void ECSAnimationEditor::canvas_scrub_finished(bool) { canvas_scrubbing=false; }
 void ECSAnimationEditor::canvas_value_changed(double,int field,int) {
 	if(refreshing_canvas || refreshing || scene.is_null()) { return; }
 	property->select(field==0?1:field==1?0:field==2?2:3);
 	if(field==0) { x->set_value(0); y->set_value(0); z->set_value(Math::deg_to_rad(canvas_values[0]->get_value())); }
 	else { int start=field==1?1:field==2?3:5; x->set_value(field==3?Math::deg_to_rad(canvas_values[start]->get_value()):canvas_values[start]->get_value()); y->set_value(field==3?Math::deg_to_rad(canvas_values[start+1]->get_value()):canvas_values[start+1]->get_value()); z->set_value(field==2?1:0); }
-	if(animation_mode && !auto_key->is_pressed()) { local_canvas->preview_authoring_vector(target->get_selected_id(),property->get_item_text(property->get_selected()),Vector3(x->get_value(),y->get_value(),z->get_value())); feedback->set_text(TTR("Auto key is off. Use the diamond button to record this transform.")); return; }
+	if(animation_mode && (canvas_scrubbing || !auto_key->is_pressed())) { local_canvas->preview_authoring_vector(target->get_selected_id(),property->get_item_text(property->get_selected()),Vector3(x->get_value(),y->get_value(),z->get_value())); if(!canvas_scrubbing) { feedback->set_text(TTR("Auto key is off. Use the diamond button to record this transform.")); } return; }
+    if(canvas_scrubbing) {
+        Array after=compensated_pose(target->get_selected_id(),property->get_item_text(property->get_selected()),Vector3(x->get_value(),y->get_value(),z->get_value()));
+        if(!after.is_empty()) { local_canvas->preview_setup_pose(after); }
+        return;
+    }
 	action(14); refresh_canvas_values();
+}
+void ECSAnimationEditor::contextual_control(Control *control,int contexts,bool setup_only,bool animation_only) {
+    control->set_meta("inspector_contexts",contexts); control->set_meta("inspector_setup_only",setup_only); control->set_meta("inspector_animation_only",animation_only);
+    contextual_controls.push_back(control);
+}
+int ECSAnimationEditor::inspector_context() const {
+    if(inspector_selection.has("event")) { return INSPECT_EVENT; }
+    if(inspector_selection.has("animation")) { return INSPECT_ANIMATION; }
+    if(inspector_selection.has("placeholder")) { return INSPECT_PLACEHOLDER; }
+    if(inspector_selection.has("skin")) { return INSPECT_SKIN; }
+    if(inspector_selection.has("slot")) { return INSPECT_SLOT; }
+    if(inspector_selection.has("skin_group")) { return INSPECT_SKINS; }
+    int index=target?target->get_selected_id():-1;
+    if(scene.is_null() || index<0 || index>=scene->get_entities().size()) { return 0; }
+    Dictionary entity=scene->get_entities()[index];
+    return entity.has("bone_2d")?INSPECT_BONE:entity.has("polygon_2d")?INSPECT_IMAGE:INSPECT_RIG;
+}
+void ECSAnimationEditor::refresh_inspector_context() {
+    if(!setup_property_panel || !slot_property_panel) { return; }
+    int context=inspector_context(); bool spatial=context&(INSPECT_RIG|INSPECT_BONE|INSPECT_IMAGE);
+    for(Control *control:contextual_controls) {
+        bool visible=(int(control->get_meta("inspector_contexts"))&context)!=0;
+        if(bool(control->get_meta("inspector_setup_only")) && animation_mode) { visible=false; }
+        if(bool(control->get_meta("inspector_animation_only")) && !animation_mode) { visible=false; }
+        control->set_visible(visible);
+    }
+    bool painting=context==INSPECT_IMAGE && !animation_mode && brush_enabled->is_pressed();
+    brush_bone->set_visible(painting);
+    Object::cast_to<Control>(brush_radius->get_parent())->set_visible(painting);
+    Object::cast_to<Control>(brush_strength->get_parent())->set_visible(painting);
+    Object::cast_to<Control>(transform_property_host->get_parent())->set_visible(spatial);
+    bone_properties->set_visible(context==INSPECT_BONE);
+    setup_property_panel->set_visible(spatial && !animation_mode);
+    Object::cast_to<FoldableContainer>(setup_property_panel)->set_title(context==INSPECT_BONE?TTR("IK Constraints"):context==INSPECT_IMAGE?TTR("Skinning"):TTR("Skeleton Setup"));
+    slot_property_panel->set_visible(context && context!=INSPECT_IMAGE && context!=INSPECT_ANIMATION && context!=INSPECT_EVENT && !(context==INSPECT_BONE && animation_mode));
+    Object::cast_to<FoldableContainer>(slot_property_panel)->set_title(context==INSPECT_SLOT?TTR("Slot"):context==INSPECT_PLACEHOLDER?TTR("Skin Binding"):context==INSPECT_BONE?TTR("Slots"):TTR("Skins"));
+    animation_property_panel->set_visible(animation_mode && (context&(INSPECT_RIG|INSPECT_ANIMATION)));
+    event_property_panel->set_visible(animation_mode && (context&(INSPECT_ANIMATION|INSPECT_EVENT)));
+    curve_property_panel->set_visible(animation_mode && (context==INSPECT_ANIMATION || inspector_selection.has("key")));
+    if(!(context&(INSPECT_RIG|INSPECT_SKIN|INSPECT_SKINS))) { Object::cast_to<Control>(wardrobe_tools->get_parent())->hide(); }
+    Object::cast_to<Control>(selection_name->get_parent())->set_visible(context && context!=INSPECT_SKINS && context!=INSPECT_ANIMATION && context!=INSPECT_EVENT);
+    // Restore the actual virtual tree item after rebuilding the tree for undo/redo.
+    if(!inspector_selection.is_empty()) {
+        bool blocked=hierarchy->is_blocking_signals(); hierarchy->set_block_signals(true);
+        for(TreeItem *row=hierarchy->get_root()?hierarchy->get_root()->get_next_in_tree():nullptr;row;row=row->get_next_in_tree()) {
+            Variant metadata=row->get_metadata(0);
+            if(metadata.get_type()==Variant::DICTIONARY && Dictionary(metadata).recursive_equal(inspector_selection,0)) { row->select(0); break; }
+        }
+        hierarchy->set_block_signals(blocked);
+    }
 }
 void ECSAnimationEditor::refresh_selection_properties() {
     if(!selection_name || scene.is_null()) { return; }
     int index=target->get_selected_id(); if(index<0 || index>=scene->get_entities().size()) { return; }
     Dictionary entity=scene->get_entities()[index]; bool was_refreshing=refreshing; refreshing=true;
-    if(!selection_name->has_focus()) { selection_name->set_text(entity.get("name",String())); }
-    selection_name->set_editable(!animation_mode); bone_properties->set_visible(entity.has("bone_2d"));
+    if(inspector_selection.has("rig")) {
+        Dictionary definition=entity.get("skeleton_2d",Dictionary());
+        Dictionary skins=definition.get("skins",Dictionary());
+        if(inspector_selection.has("skin") && !skins.has(inspector_selection["skin"])) { inspector_selection.clear(); }
+        if(inspector_selection.has("slot")) {
+            bool exists=false; for(const Variant &entry:Array(definition.get("slots",Array()))) { if(Dictionary(entry).get("name",Variant())==inspector_selection["slot"]) { exists=true; break; } }
+            if(!exists) { inspector_selection.clear(); }
+        }
+    }
+    String name=entity.get("name",String()); String label=entity.has("bone_2d")?TTR("Bone"):entity.has("polygon_2d")?TTR("Image"):TTR("Skeleton");
+    if(inspector_selection.has("placeholder")) { name=inspector_selection["placeholder"]; label=TTR("Skin Placeholder"); }
+    else if(inspector_selection.has("skin")) { name=inspector_selection["skin"]; label=TTR("Skin"); }
+    else if(inspector_selection.has("slot")) { name=inspector_selection["slot"]; label=TTR("Slot"); }
+    else if(inspector_selection.has("skin_group")) { name=String(); label=TTR("Skins"); }
+    else if(inspector_selection.has("animation")) { name=inspector_selection["animation"]; label=TTR("Animation"); }
+    else if(inspector_selection.has("event")) { name=inspector_selection["event"]; label=TTR("Event"); }
+    if(!selection_name->has_focus()) { selection_name->set_text(name); }
+    selection_name->set_editable(!animation_mode && inspector_selection.is_empty()); bone_properties->set_visible(entity.has("bone_2d"));
     selection_length->set_editable(!animation_mode);
     selection_length->set_value_no_signal(double(Dictionary(entity.get("bone_2d",Dictionary())).get("length",100.0)));
-    selection_title->set_text((entity.has("bone_2d")?String(U"骨骼："):entity.has("polygon_2d")?String(U"图片："):String(U"骨架："))+String(entity.get("name","")));
+    selection_title->set_text(name.is_empty()?label:label+": "+name);
+    refresh_inspector_context();
     refreshing=was_refreshing;
 }
 void ECSAnimationEditor::selection_property_changed() {
-    if(refreshing || animation_mode || scene.is_null()) { return; }
+    if(refreshing || animation_mode || scene.is_null() || !inspector_selection.is_empty()) { return; }
     int index=target->get_selected_id(); if(index<0 || index>=scene->get_entities().size()) { return; }
     String name=selection_name->get_text().strip_edges(); if(name.is_empty()) { refresh_selection_properties(); return; }
     Array entities=scene->get_entities().duplicate(true); Dictionary entity=entities[index];

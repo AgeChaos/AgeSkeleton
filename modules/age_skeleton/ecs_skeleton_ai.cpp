@@ -1,3 +1,4 @@
+#include "skeleton_document.h"
 // Editor-only local automation for the skeletal authoring workspace.
 #ifdef TOOLS_ENABLED
 #include "ecs_animation_editor.h"
@@ -94,14 +95,14 @@ void ECSAnimationEditor::skeleton_ai_poll() {
 Dictionary ECSAnimationEditor::skeleton_ai_request(const Dictionary &request) {
     String op=request.get("operation","status"); Dictionary reply;
     auto finish=[&](bool ok,const String &error=String()) { reply["ok"]=ok; reply["operation"]=op; reply["revision"]=skeleton_ai_revision; if(!ok) { reply["error"]=error; } return reply; };
-    auto project_path=[](const String &path) { return path.begins_with("res://") && !path.contains("..") && !path.contains("::") && !path.contains("\\") && !path.begins_with("res://.godot/"); };
+    auto project_path=[](const String &path) { return path.is_absolute_path() && !path.contains("..") && !path.contains("::") && !path.contains("\\") && !path.begins_with("res://.godot/"); };
     for(const char *name:{"revision","entity","parent","owner","track","key"}) {
         if(!request.has(name)) { continue; } Variant v=request[name];
         if((v.get_type()!=Variant::INT && v.get_type()!=Variant::FLOAT) || !Math::is_finite(double(v)) || double(v)!=Math::floor(double(v)) || double(v)<-1 || double(v)>2147483647) { return finish(false,"Invalid integer: "+String(name)); }
     }
     Array entities=scene.is_valid()?scene->get_entities():Array();
     if(op=="capabilities") {
-        reply["operations"]=PackedStringArray({"status","inspect","new","open","import_spine","add_bone","add_image","pose","bind","subdivide","paint_weights","rename","patch","component","tracks","edit_key","animation_manage","view","validate","export_presets","export","export_runtime","ui_tree","ui_action","skin","slot","wardrobe","animation","key","preview","events","save","screenshot","undo","redo"});
+        reply["operations"]=PackedStringArray({"status","inspect","new","open","import_spine","add_bone","add_image","auto_contour","pose","bind","subdivide","paint_weights","rename","patch","component","tracks","edit_key","animation_manage","view","validate","export_presets","export","export_runtime","ui_tree","ui_action","skin","slot","wardrobe","animation","key","preview","events","save","screenshot","undo","redo"});
         Dictionary parameters;
         parameters["export_runtime"]="entity:skeleton index, directory:new output directory, fps:1..120 (default 30); sampled portable mesh clips";
         parameters["wardrobe"]="entity:skeleton index, group:skin folder, skin:full group/variant name; empty skin restores the default part";
@@ -109,6 +110,7 @@ Dictionary ECSAnimationEditor::skeleton_ai_request(const Dictionary &request) {
         parameters["paint_weights"]="entity:int, strokes:[{bone:entity index,center:Vector2,radius:positive number,strength:-1..1}]";
         parameters["component"]="entity:int, component:bone_2d|skeleton_2d|polygon_2d, fields:typed dictionary (merged)";
         parameters["patch"]="changes:[{entity:int,field:name|position|rotation|scale|shear|bone_2d|skeleton_2d|polygon_2d,value:typed value}]";
+        parameters["auto_contour"]="entity:image index, threshold:0..0.99 (default 0.1), precision:0.1..32 pixels (default 4), margin:0..16 pixels (default 2); undoable alpha contour with interpolated weights";
         parameters["bind"]="entity:image index, bones:optional array of bone entity indices";
         parameters["tracks"]="entity:skeleton index, animation:optional name";
         parameters["edit_key"]="entity:skeleton index, animation:name, track:int, key:int, action:delete|move|curve, time:seconds (move), interpolation:0..2 and transition:0.05..20 (curve)";
@@ -136,7 +138,7 @@ Dictionary ECSAnimationEditor::skeleton_ai_request(const Dictionary &request) {
             if(ItemList *list=Object::cast_to<ItemList>(control)) { Array entries; for(int i=0;i<list->get_item_count();i++) { Dictionary entry; entry["index"]=i; entry["text"]=list->get_item_text(i); entry["selected"]=list->is_selected(i); entries.push_back(entry); } item["items"]=entries; }
             if(TabBar *tabs=Object::cast_to<TabBar>(control)) { Array entries; for(int i=0;i<tabs->get_tab_count();i++) entries.push_back(tabs->get_tab_title(i));item["items"]=entries;item["selected"]=tabs->get_current_tab(); }
             if(TabContainer *tabs=Object::cast_to<TabContainer>(control)) { Array entries; for(int i=0;i<tabs->get_tab_count();i++) { entries.push_back(tabs->get_tab_title(i)); } item["items"]=entries; item["selected"]=tabs->get_current_tab(); }
-            if(Tree *tree=Object::cast_to<Tree>(control)) { Array rows; Vector<TreeItem *> todo; if(tree->get_root()) { todo.push_back(tree->get_root()); } while(!todo.is_empty() && rows.size()<1024) { TreeItem *row=todo[0]; todo.remove_at(0); Dictionary entry; entry["index"]=rows.size(); entry["text"]=row->get_text(0); entry["selected"]=row->is_selected(0); entry["collapsed"]=row->is_collapsed(); rows.push_back(entry); for(TreeItem *child=row->get_first_child();child;child=child->get_next()) { todo.push_back(child); } } item["items"]=rows; }
+            if(Tree *tree=Object::cast_to<Tree>(control)) { Array rows; Vector<TreeItem *> todo; if(tree->get_root()) { todo.push_back(tree->get_root()); } while(!todo.is_empty() && rows.size()<1024) { TreeItem *row=todo[0]; todo.remove_at(0); Dictionary entry; entry["index"]=rows.size(); entry["text"]=row->get_text(0); entry["selected"]=row->is_selected(0); entry["collapsed"]=row->is_collapsed(); entry["metadata"]=ECSAIValue::encode(row->get_metadata(0)); rows.push_back(entry); for(TreeItem *child=row->get_first_child();child;child=child->get_next()) { todo.push_back(child); } } item["items"]=rows; }
             controls.push_back(item);
         }
         // PopupMenu is a Window rather than a Control. Include visible menus separately.
@@ -198,9 +200,10 @@ Dictionary ECSAnimationEditor::skeleton_ai_request(const Dictionary &request) {
     }
     if(op=="open" || op=="import_spine") {
         if(scene.is_valid() && !bool(request.get("replace",false))) { return finish(false,"Use replace=true to replace the current workspace; save first"); }
-        String path=request.get("path",""); if(!project_path(path)) { return finish(false,"Expected project resource path"); }
+        String path=String(request.get("path","")).replace("\\","/"); if(!project_path(path)) { return finish(false,"Expected project resource path"); }
         Ref<ECSScene> loaded;
         if(op=="import_spine") { String report; loaded=ecs_import_spine_json(path,report); reply["report"]=report; }
+        else if(path.get_extension().to_lower()=="ageskeleton") { String report; loaded=SkeletonDocument::load(path,report); reply["report"]=report; }
         else { loaded=ResourceLoader::load(path,"ECSScene",ResourceLoader::CACHE_MODE_IGNORE); }
         if(loaded.is_null() || loaded->instantiate().is_null()) { return finish(false,"Invalid skeletal project"); }
         adopt_project(loaded); return finish(true);
@@ -221,14 +224,15 @@ Dictionary ECSAnimationEditor::skeleton_ai_request(const Dictionary &request) {
         reply["path"]=path; reply["error_code"]=int(result); return finish(result==OK,result==OK?String():"Export failed; check platform templates and editor log");
     }
     if(op=="save") {
-        String path=request.get("path",scene->get_path());
-        if(!project_path(path) || path.get_extension()!="tres") { return finish(false,"Expected res://...tres"); }
+        String path=String(request.get("path",scene->get_path())).replace("\\","/");
+        if(!project_path(path) || (path.get_extension()!="ageskeleton" && path.get_extension()!="tres")) { return finish(false,"Expected an absolute .ageskeleton path (or legacy res://...tres)"); }
         if(FileAccess::exists(path)) {
             if(path!=scene->get_path() && !bool(request.get("overwrite",false))) { return finish(false,"Destination exists; choose another path or set overwrite=true"); }
-            if(DirAccess::copy_absolute(path,path+".ai-backup")!=OK) { return finish(false,"Cannot back up destination"); }
+            if(DirAccess::copy_absolute(path,skeleton_ai_directory.path_join("project-backup."+path.get_extension()))!=OK) { return finish(false,"Cannot back up destination"); }
         }
-        if(ResourceSaver::save(scene,path,ResourceSaver::FLAG_BUNDLE_RESOURCES)!=OK) { return finish(false,"Save failed"); }
-        scene->set_path(path); ++skeleton_ai_revision; reply["path"]=path; return finish(true);
+        String report; Error saved=path.get_extension()=="ageskeleton" ? SkeletonDocument::save(scene,path,report) : ResourceSaver::save(scene,path,ResourceSaver::FLAG_BUNDLE_RESOURCES);
+        if(saved!=OK) { return finish(false,"Save failed: "+report); }
+        scene->set_path(path, true); ++skeleton_ai_revision; reply["path"]=path; return finish(true);
     }
     if(op=="undo" || op=="redo") {
         auto *manager=EditorUndoRedoManager::get_singleton(); UndoRedo *history=manager->get_history_undo_redo(manager->get_history_id_for_object(scene.ptr()));
@@ -238,7 +242,7 @@ Dictionary ECSAnimationEditor::skeleton_ai_request(const Dictionary &request) {
         String target=request.get("target",String());
         Viewport *capture=get_viewport();
         if(!target.is_empty()) {
-            Window *dialog=target=="settings"?preferences_dialog:target=="export"?asset_export_dialog:target=="export_preview"?export_preview_dialog:nullptr;
+            Window *dialog=target=="contour"?contour_dialog:target=="settings"?preferences_dialog:target=="export"?asset_export_dialog:target=="export_preview"?export_preview_dialog:nullptr;
             if(target=="tooltip") { for(int i=0;i<hierarchy->get_child_count();++i) { Window *window=Object::cast_to<Window>(hierarchy->get_child(i));if(window && window->is_visible()) { dialog=window;break; } } }
             if(!dialog || !dialog->is_visible()) { return finish(false,"Requested dialog is not visible"); }
             capture=dialog;
@@ -263,7 +267,10 @@ Dictionary ECSAnimationEditor::skeleton_ai_request(const Dictionary &request) {
         String path=request.get("path",String()),command=request.get("action",String());
         NodePath node_path(path); if(path.is_empty() || node_path.is_absolute() || path.contains("..") || node_path.get_subname_count()) { return finish(false,"Expected local path returned by ui_tree"); }
         Node *node=get_node_or_null(node_path); if(!node || (node!=this && !is_ancestor_of(node))) { return finish(false,"Control no longer exists; query ui_tree"); }
-        if(command=="menu_select") {
+        if(node==contour_dialog && (command=="confirm" || command=="cancel")) {
+            if(!contour_dialog->is_visible()) { return finish(false,"Contour dialog is not visible"); }
+            contour_dialog->hide(); if(command=="confirm") { confirm_auto_contour(); } else { contour_scene.unref(); }
+        } else if(command=="menu_select") {
             PopupMenu *menu=Object::cast_to<PopupMenu>(node); Variant index=request.get("index",-1);
             if(!menu || !menu->is_visible() || (index.get_type()!=Variant::INT && index.get_type()!=Variant::FLOAT) || !Math::is_finite(double(index)) || double(index)!=Math::floor(double(index)) || double(index)<0 || double(index)>=menu->get_item_count() || menu->is_item_disabled(int(index)) || menu->is_item_separator(int(index))) { return finish(false,"Invalid visible menu item"); }
             int id=menu->get_item_id(int(index)); menu->hide(); menu->emit_signal("id_pressed",id);
@@ -339,6 +346,13 @@ Dictionary ECSAnimationEditor::skeleton_ai_request(const Dictionary &request) {
         for(int i=0;i<ids.size();i++) { if(Dictionary(scene->get_entities()[i]).has("polygon_2d") && world->is_skeleton_attachment_visible(ids[i])) { visible.push_back(i); } }
         reply["visible_attachments"]=visible;
         return finish(true);
+    }
+    if(op=="auto_contour") {
+        Variant threshold=request.get("threshold",.1),precision=request.get("precision",4.0),margin=request.get("margin",2);
+        for(const Variant &number:{threshold,precision,margin}) { if((number.get_type()!=Variant::INT && number.get_type()!=Variant::FLOAT) || !Math::is_finite(double(number))) { return finish(false,"Expected finite contour settings"); } }
+        if(double(margin)!=Math::floor(double(margin)) || double(margin)<0 || double(margin)>16) { return finish(false,"Expected integer margin from 0 to 16"); }
+        String error; bool result=generate_auto_contour(request.get("entity",-1),threshold,precision,int(margin),error);
+        return finish(result,error);
     }
     if(op=="component") {
         int index=request.get("entity",-1); String component=request.get("component",String()); bool valid=true;
@@ -496,7 +510,7 @@ Dictionary ECSAnimationEditor::skeleton_ai_request(const Dictionary &request) {
         commit_entities(after,String(U"AI 添加骨骼")); select_target(after.size()-1); reply["entity"]=after.size()-1; return finish(true);
     }
     if(op=="add_image") {
-        String path=request.get("path",""); if(!project_path(path) || !FileAccess::exists(path)) { return finish(false,"Expected existing project image"); }
+        String path=String(request.get("path","")).replace("\\","/"); if(!project_path(path) || !FileAccess::exists(path)) { return finish(false,"Expected existing project image"); }
         if(!PackedStringArray({"png","jpg","jpeg","webp"}).has(path.get_extension().to_lower())) { return finish(false,"Unsupported image format"); }
         set_mode(0); project_operation=7; project_file_selected(path);
         if(scene->get_entities().size()!=entities.size()+1) { return finish(false,"Image import failed"); }

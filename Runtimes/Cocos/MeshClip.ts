@@ -46,21 +46,47 @@ export class Player {
     readonly positions:Float32Array; readonly colors:Float32Array; readonly visible:boolean[]; readonly orders:Int32Array;
     playing=false; speed=1; time=0; clip:Clip|null=null;
     events:AnimationEvent[]=[];private motion:MotionPose;private eventStart=false;
+    private pose:Frame;private sourcePose:Frame;private sourceClip:Clip|null=null;private sourceTime=0;private fadeDuration=0;private fadeElapsed=0;
+    get isBlending():boolean{return this.fadeDuration>0;}
+    get blendProgress():number{return this.isBlending?this.fadeElapsed/this.fadeDuration:1;}
+    private cancelFade():void{this.fadeDuration=this.fadeElapsed=0;this.sourceClip=null;}
+    private buffer(f:Frame):Frame{return {time:0,positions:new Array(f.positions.length).fill(0),colors:new Array(f.colors.length).fill(0),keys:new Array(f.keys.length).fill(''),orders:new Array(f.orders.length).fill(0),matrices:new Array(f.matrices?.length??0).fill(0),influencePositions:new Array(f.influencePositions?.length??0).fill(0)};}
+    private blendNumbers(a:number[]|undefined,b:number[]|undefined,t:number,out:number[]):void{for(let i=0;i<out.length;i++)out[i]=t<=0?a![i]:t>=1?b![i]:a![i]+(b![i]-a![i])*t;}
+    private blendPose(a:Frame,b:Frame,t:number,targetKeys:boolean,out:Frame):void{
+        this.blendNumbers(a.positions,b.positions,t,out.positions);this.blendNumbers(a.colors,b.colors,t,out.colors);
+        this.blendNumbers(a.matrices,b.matrices,t,out.matrices!);this.blendNumbers(a.influencePositions,b.influencePositions,t,out.influencePositions!);
+        for(let i=0;i<out.keys.length;i++){out.keys[i]=targetKeys?b.keys[i]:a.keys[i];out.orders[i]=targetKeys?b.orders[i]:a.orders[i];}
+    }
+    private clipTime(c:Clip,at:number):number{return c.loop?((at%c.duration)+c.duration)%c.duration:Math.max(0,Math.min(c.duration,at));}
+    private samplePose(c:Clip|null,at:number,out:Frame):void{
+        let a=this.data.rest,b=a,t=0;if(c){let lo=0,hi=c.frames.length-1;while(lo<hi){const mid=(lo+hi+1)>>1;if(c.frames[mid].time<=at)lo=mid;else hi=mid-1;}a=c.frames[lo];b=c.frames[Math.min(lo+1,c.frames.length-1)];t=b.time>a.time?(at-a.time)/(b.time-a.time):0;}
+        this.blendPose(a,b,t,false,out);
+    }
     private active:string[]; private overrides:(string|null)[]; private hidden:boolean[];
     constructor(readonly data:MeshClip) {
-        validate(data);this.motion=new MotionPose(data.version===2?data.rig:undefined);this.positions=new Float32Array(data.vertexCount*2);this.colors=new Float32Array(data.attachments.length*4);this.visible=new Array(data.attachments.length).fill(false);this.orders=new Int32Array(data.attachments.length);
+        validate(data);this.pose=this.buffer(data.rest);this.sourcePose=this.buffer(data.rest);this.motion=new MotionPose(data.version===2?data.rig:undefined);this.positions=new Float32Array(data.vertexCount*2);this.colors=new Float32Array(data.attachments.length*4);this.visible=new Array(data.attachments.length).fill(false);this.orders=new Int32Array(data.attachments.length);
         this.active=data.defaultSkins.slice();this.overrides=new Array(data.slots.length).fill(null);this.hidden=new Array(data.slots.length).fill(false);this.evaluate();
     }
-    play(name:string,restart=true):void {const next=this.data.clips.find(c=>c.name===name);if(!next)throw new Error('Unknown animation');if(restart||this.clip!==next){this.time=0;this.eventStart=true;}this.events=[];this.clip=next;this.playing=true;this.evaluate();}
-    stop():void {this.events=[];this.eventStart=false;this.clip=null;this.time=0;this.playing=false;this.evaluate();}
-    seek(time:number):void {if(!Number.isFinite(time))throw new Error('Invalid time');this.events=[];this.eventStart=false;this.time=this.clip?Math.max(0,Math.min(this.clip.duration,time)):0;this.evaluate();}
+    play(name:string,restart=true):void {const next=this.data.clips.find(c=>c.name===name);if(!next)throw new Error('Unknown animation');this.cancelFade();if(restart||this.clip!==next){this.time=0;this.eventStart=true;}this.events=[];this.clip=next;this.playing=true;this.evaluate();}
+    crossFade(name:string,duration=.2,restart=true):void {
+        if(!Number.isFinite(duration)||duration<0)throw new Error('Invalid blend duration');
+        const next=this.data.clips.find(c=>c.name===name);if(!next)throw new Error('Unknown animation');
+        if(duration===0){this.play(name,restart);return;}
+        this.evaluate();this.blendPose(this.pose,this.pose,0,false,this.sourcePose);this.sourceClip=!this.isBlending&&this.playing?this.clip:null;this.sourceTime=this.time;
+        if(restart||next!==this.clip){this.time=0;this.eventStart=true;}
+        this.clip=next;this.fadeDuration=duration;this.fadeElapsed=0;this.events=[];this.playing=true;this.evaluate();
+    }
+    stop():void {this.cancelFade();this.events=[];this.eventStart=false;this.clip=null;this.time=0;this.playing=false;this.evaluate();}
+    seek(time:number):void {if(!Number.isFinite(time))throw new Error('Invalid time');this.cancelFade();this.events=[];this.eventStart=false;this.time=this.clip?Math.max(0,Math.min(this.clip.duration,time)):0;this.evaluate();}
     update(delta:number):void {
         this.events=[];if(!this.playing||!this.clip)return;if(!Number.isFinite(delta)||delta<0||!Number.isFinite(this.speed))throw new Error('Invalid playback step');
         let t=this.time+delta*this.speed;if(!Number.isFinite(t))throw new Error('Playback overflow');
         const to=this.clip.loop?t:Math.max(0,Math.min(this.clip.duration,t));this.events=this.data.version===2?collectEvents(this.clip,this.time,to,this.eventStart):[];if(to!==this.time)this.eventStart=false;
-        if(this.clip.loop)t=((t%this.clip.duration)+this.clip.duration)%this.clip.duration;
-        else {if(t>=this.clip.duration||t<0)this.playing=false;t=Math.max(0,Math.min(this.clip.duration,t));}
-        this.time=t;this.evaluate();
+        const step=delta*this.speed;
+        if(this.isBlending){if(this.sourceClip)this.sourceTime=this.clipTime(this.sourceClip,this.sourceTime+step);this.fadeElapsed=Math.min(this.fadeDuration,this.fadeElapsed+Math.abs(step));if(this.fadeElapsed>=this.fadeDuration)this.cancelFade();}
+        this.time=this.clipTime(this.clip,t);
+        if(!this.clip.loop&&!this.isBlending&&((this.speed>0&&t>=this.clip.duration)||(this.speed<0&&t<=0)))this.playing=false;
+        this.evaluate();
     }
     setIKTarget(bone:string,x:number,y:number,chainLength=2,mix=1,iterations=24,tolerance=.1):void{this.motion.setTarget(bone,x,y,chainLength,mix,iterations,tolerance);this.evaluate();}
     clearIKTarget(bone:string):void{this.motion.clearTarget(bone);this.evaluate();}
@@ -77,11 +103,10 @@ export class Player {
     private skin(name:string):Skin {const skin=this.data.skins.find(s=>s.name===name);if(!skin)throw new Error('Unknown skin');return skin;}
     private resolve(skin:string,slot:number,key:string,fallback:number):number {const found=this.data.skins.find(s=>s.name===skin);if(found)for(const b of found.bindings)if(b.slot===slot&&b.key===key)fallback=b.attachment;return fallback;}
     private evaluate():void {
-        let a=this.data.rest,b=a,t=0;
-        if(this.clip){let lo=0,hi=this.clip.frames.length-1;while(lo<hi){const mid=(lo+hi+1)>>1;if(this.clip.frames[mid].time<=this.time)lo=mid;else hi=mid-1;}a=this.clip.frames[lo];b=this.clip.frames[Math.min(lo+1,this.clip.frames.length-1)];t=b.time>a.time?(this.time-a.time)/(b.time-a.time):0;}
-        for(let i=0;i<this.positions.length;i++)this.positions[i]=a.positions[i]+(b.positions[i]-a.positions[i])*t;
-        this.motion.apply(a,b,t,this.positions);
-        for(let i=0;i<this.data.attachments.length;i++){const m=this.data.attachments[i],s=m.slot;this.visible[i]=s<0;this.orders[i]=s<0?i:a.orders[s];for(let k=0;k<4;k++)this.colors[i*4+k]=m.color[k]*(s<0?1:a.colors[s*4+k]+(b.colors[s*4+k]-a.colors[s*4+k])*t);}
-        for(let s=0;s<this.data.slots.length;s++){if(this.hidden[s])continue;const key=this.overrides[s]??a.keys[s];if(!key)continue;let i=this.resolve('default',s,key,-1);for(const skin of this.active)i=this.resolve(skin,s,key,i);if(i>=0)this.visible[i]=true;}
+        this.samplePose(this.clip,this.time,this.pose);
+        if(this.isBlending){if(this.sourceClip)this.samplePose(this.sourceClip,this.sourceTime,this.sourcePose);const w=this.blendProgress;this.blendPose(this.sourcePose,this.pose,w,w>=.5,this.pose);}
+        this.positions.set(this.pose.positions);this.motion.apply(this.pose,this.pose,0,this.positions);
+        for(let i=0;i<this.data.attachments.length;i++){const m=this.data.attachments[i],s=m.slot;this.visible[i]=s<0;this.orders[i]=s<0?i:this.pose.orders[s];for(let k=0;k<4;k++)this.colors[i*4+k]=m.color[k]*(s<0?1:this.pose.colors[s*4+k]);}
+        for(let s=0;s<this.data.slots.length;s++){if(this.hidden[s])continue;const key=this.overrides[s]??this.pose.keys[s];if(!key)continue;let i=this.resolve('default',s,key,-1);for(const skin of this.active)i=this.resolve(skin,s,key,i);if(i>=0)this.visible[i]=true;}
     }
 }

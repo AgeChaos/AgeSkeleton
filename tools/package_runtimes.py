@@ -13,7 +13,7 @@ def main():
     args=parser.parse_args(); args.output.mkdir(parents=True,exist_ok=True)
     # AgeChaos uses its built-in ECS SDK and needs no separate runtime package.
     for target in ('Unity','Cocos','Unreal','Godot'):
-        archive=args.output/f'AgeSkeleton-{target}-0.3.0-source.zip'
+        archive=args.output/f'AgeSkeleton-{target}-0.4.0-source.zip'
         if archive.exists(): raise SystemExit(f'Refusing to overwrite {archive}')
         with tempfile.TemporaryDirectory() as work:
             staged=Path(work)/target

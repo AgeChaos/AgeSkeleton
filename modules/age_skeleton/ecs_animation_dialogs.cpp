@@ -233,7 +233,7 @@ void ECSAnimationEditor::export_format_changed(int index) {
             case 3: detail=TTR("Unity 2022.3 / 6: import atlas textures with the UPM runtime, or use Unity Sprite Atlas.");break;
             case 4: detail=TTR("Cocos Creator 3.8: use the TypeScript component with textures or a native SpriteAtlas (no trim or rotation).");break;
         }
-        export_description->set_text(detail+"\n"+TTR("Exports all clips and skins with PNG atlases, runtime IK targets and animation events. Animation crossfades are not included. Choose a new folder."));
+        export_description->set_text(detail+"\n"+TTR("Exports all clips and skins with PNG atlases, animation crossfades, runtime IK targets and animation events. Choose a new folder."));
         String name=scene->get_path().get_file().get_basename().trim_suffix(".ecsrig");
         export_path->set_text(ProjectSettings::get_singleton()->globalize_path(scene->get_path().get_base_dir().path_join(name+"_"+engine.to_lower()))); export_status->set_text(String());return;
     }

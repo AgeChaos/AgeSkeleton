@@ -2,6 +2,7 @@
 #include "ecs_animation_editor.h"
 #include "skeleton_workspace_docking.h"
 #include "skeleton_attachment_tree.h"
+#include "skeleton_scrub_spin_box.h"
 #include "ecs_skeleton_icons.h"
 #include "ecs_timeline_layout.h"
 #include "ecs_spine_import.h"
@@ -350,11 +351,11 @@ ECSAnimationEditor::ECSAnimationEditor() {
 	auto *project_menu=memnew(MenuButton); project_menu->set_text(String(U"工程")); project_menu->set_flat(true); bar->add_child(project_menu);
 	const char32_t *labels[]={U"新建骨骼动画工程",U"打开工程",U"保存工程",U"工程另存为",U"新建骨架",U"添加子骨骼",U"导入 Spine JSON",U"添加图片"};
 	for(int i=0;i<8;i++) { project_menu->get_popup()->add_item(String(labels[i]),i); }
-	project_menu->get_popup()->add_separator(); project_menu->get_popup()->add_item(String(U"导出…"),8); project_menu->get_popup()->add_item(String(U"设置…"),11); 
+	project_menu->get_popup()->add_separator(); project_menu->get_popup()->add_item(String(U"导出…"),8); project_menu->get_popup()->add_item(String(U"设置…"),11); project_menu->get_popup()->add_separator(); project_menu->get_popup()->add_item(TTR("Open Project Folder"),12);
 	project_menu->get_popup()->connect("id_pressed",callable_mp(this,&ECSAnimationEditor::project_action));
 	project_dialog=memnew(EditorFileDialog); add_child(project_dialog); project_dialog->connect("file_selected",callable_mp(this,&ECSAnimationEditor::project_file_selected));
 	replace_dialog=memnew(ConfirmationDialog); replace_dialog->set_text(String(U"切换工程将关闭当前编辑内容。请先保存需要保留的修改。继续？")); add_child(replace_dialog); replace_dialog->connect("confirmed",callable_mp(this,&ECSAnimationEditor::confirm_project_action));
-	mode_button=memnew(Button); mode_button->set_text(String(U"设置")); mode_button->set_flat(true); mode_button->set_custom_minimum_size(Size2(100,0)); mode_button->connect("pressed",callable_mp(this,&ECSAnimationEditor::toggle_authoring_mode)); bar->add_child(mode_button);
+	mode_button=memnew(Button); mode_button->set_text(String(U"设置")); mode_button->set_flat(true); mode_button->set_custom_minimum_size(Size2(100,0)); mode_button->connect("pressed",callable_mp(this,&ECSAnimationEditor::toggle_authoring_mode)); bar->add_child(mode_button); bar->move_child(mode_button,project_menu->get_index());
 	owner=memnew(OptionButton); owner->set_h_size_flags(SIZE_EXPAND_FILL); bar->add_child(owner); owner->hide(); owner->connect("item_selected",callable_mp(this,&ECSAnimationEditor::refresh_tracks));
 	divider();
 	for(int command:{16,17,0}) { auto *b=memnew(Button); const char *icon=command==16?"UndoRedo":command==17?"Redo":"Reload"; b->set_button_icon(EditorNode::get_singleton()->get_editor_theme()->get_icon(icon,"EditorIcons")); b->set_tooltip_text(command==16?String(U"撤销"):command==17?String(U"重做"):String(U"刷新")); if(command==16 || command==17) {
@@ -384,8 +385,21 @@ ECSAnimationEditor::ECSAnimationEditor() {
 		for(const char *name:{"font_disabled_color","icon_disabled_color"}) { item->add_theme_color_override(name,Color(.44,.47,.49)); }
 	}
 	image_tools=memnew(HBoxContainer); add_child(image_tools);
-	for(int i=0;i<4;i++) { auto *b=memnew(Button); const char32_t *names[]={U"添加图片",U"细分网格",U"绑定骨骼",U"权重"}; b->set_text(String(names[i])); b->connect("pressed",callable_mp(this,&ECSAnimationEditor::image_action).bind(i)); image_tools->add_child(b); }
+	for(int i:{0,4,1,2,3}) { auto *b=memnew(Button); const char32_t *names[]={U"添加图片",U"细分网格",U"绑定骨骼",U"权重"}; b->set_text(i==4?TTR("Auto Contour"):String(names[i])); b->connect("pressed",callable_mp(this,&ECSAnimationEditor::image_action).bind(i)); image_tools->add_child(b); }
 	mesh_edit=memnew(CheckBox); mesh_edit->set_text(String(U"编辑网格")); image_tools->add_child(mesh_edit); mesh_edit->connect("toggled",callable_mp(this,&ECSAnimationEditor::mesh_toggled));
+	contour_dialog=memnew(ConfirmationDialog); contour_dialog->set_title(TTR("Auto Contour")); add_child(contour_dialog);
+    contour_dialog->get_ok_button()->set_text(TTR("Generate"));
+    auto *contour_body=memnew(VBoxContainer); contour_body->set_custom_minimum_size(Size2(460,0)*EDSCALE); contour_dialog->add_child(contour_body);
+    auto *contour_info=memnew(Label); contour_info->set_text(TTR("Trace the image's visible edge with fewer vertices and spaced interior control points. Skin weights are interpolated. The result can be undone.")); contour_info->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART); contour_info->set_custom_minimum_size(Size2(460,54)*EDSCALE); contour_info->set_size(Size2(460,54)*EDSCALE); contour_body->add_child(contour_info);
+    auto contour_number=[&](const String &label,double minimum,double maximum,double step,double initial) {
+        auto *row=memnew(HBoxContainer); contour_body->add_child(row); auto *caption=memnew(Label); caption->set_text(label); caption->set_h_size_flags(SIZE_EXPAND_FILL); row->add_child(caption);
+        auto *spin=memnew(SpinBox); spin->set_min(minimum); spin->set_max(maximum); spin->set_step(step); spin->set_value(initial); row->add_child(spin); return spin;
+    };
+    contour_threshold=contour_number(TTR("Alpha threshold"),.01,.99,.01,.1);
+    contour_precision=contour_number(TTR("Simplification (pixels)"),.1,32,.1,4);
+    contour_margin=contour_number(TTR("Edge padding (pixels)"),0,16,1,2);
+    contour_precision->set_tooltip_text(TTR("Smaller values follow the edge more closely and create more vertices."));
+    contour_dialog->connect("confirmed",callable_mp(this,&ECSAnimationEditor::confirm_auto_contour));
 	binding_dialog=memnew(ConfirmationDialog); binding_dialog->set_title(String(U"绑定骨骼 · 选择参与蒙皮的骨骼")); add_child(binding_dialog);
 	binding_bones=memnew(ItemList); binding_bones->set_select_mode(ItemList::SELECT_MULTI); binding_bones->set_custom_minimum_size(Size2(360,300)); binding_dialog->add_child(binding_bones); binding_dialog->connect("confirmed",callable_mp(this,&ECSAnimationEditor::apply_binding));
 	auto framed=[&](Control *parent) { auto *panel=memnew(PanelContainer); panel->set_theme_type_variation("RigPanel"); panel->set_h_size_flags(SIZE_EXPAND_FILL); panel->set_v_size_flags(SIZE_EXPAND_FILL); parent->add_child(panel); return panel; };
@@ -484,7 +498,7 @@ ECSAnimationEditor::ECSAnimationEditor() {
     hierarchy->connect("item_selected",callable_mp(this,&ECSAnimationEditor::hierarchy_selected),CONNECT_DEFERRED);
     hierarchy->connect("item_activated",callable_mp(this,&ECSAnimationEditor::hierarchy_activated),CONNECT_DEFERRED);
 	auto *property_frame=framed(sidebar); property_frame->set_custom_minimum_size(Size2(0,260)*EDSCALE); property_frame->set_stretch_ratio(1.0);
-	auto *right_scroll=memnew(ScrollContainer); right_scroll->set_horizontal_scroll_mode(ScrollContainer::SCROLL_MODE_DISABLED); property_frame->add_child(right_scroll);
+	auto *right_scroll=memnew(ScrollContainer); property_scroll=right_scroll; right_scroll->set_horizontal_scroll_mode(ScrollContainer::SCROLL_MODE_DISABLED); property_frame->add_child(right_scroll);
 	right=memnew(VBoxContainer); right->set_h_size_flags(SIZE_EXPAND_FILL); right_scroll->add_child(right);
 	auto section=[&](BoxContainer *host,const String &label,bool folded) { auto *group=memnew(FoldableContainer); group->set_title(label); group->set_folded(folded); host->add_child(group); auto *content=memnew(VBoxContainer); group->add_child(content); return content; };
 	target=memnew(OptionButton); right->add_child(target); target->hide(); target->connect("item_selected",callable_mp(this,&ECSAnimationEditor::select_target));
@@ -492,37 +506,50 @@ ECSAnimationEditor::ECSAnimationEditor() {
 	auto number=[&](const String &label,double min,double max,double step) { auto *row=memnew(HBoxContainer); right->add_child(row); auto *l=memnew(Label); l->set_text(label); l->set_custom_minimum_size(Size2(75,0)); row->add_child(l); auto *s=memnew(SpinBox); s->set_min(min); s->set_max(max); s->set_step(step); s->set_allow_greater(true); s->set_h_size_flags(SIZE_EXPAND_FILL); row->add_child(s); return s; };
 	x=number("X",-100000,100000,.01); y=number("Y",-100000,100000,.01); z=number(String(U"Z / 弧度"),-100000,100000,.01);
 	property->hide(); x->get_parent()->call("hide"); y->get_parent()->call("hide"); z->get_parent()->call("hide");
-	selection_title=header(right,String(U"属性")); selection_title->set_theme_type_variation("RigPropertyHeader");
+	selection_title=header(right,String(U"属性")); selection_title->set_theme_type_variation("RigPropertyHeader"); selection_title->set_name("SelectionTitle");
     auto *name_row=memnew(HBoxContainer); right->add_child(name_row); auto *name_caption=memnew(Label); name_caption->set_text(String(U"名称")); name_caption->set_custom_minimum_size(Size2(75,0)); name_row->add_child(name_caption);
-    selection_name=memnew(LineEdit); selection_name->set_h_size_flags(SIZE_EXPAND_FILL); name_row->add_child(selection_name); selection_name->connect("text_submitted",callable_mp(this,&ECSAnimationEditor::selection_property_changed).unbind(1)); selection_name->connect("focus_exited",callable_mp(this,&ECSAnimationEditor::selection_property_changed));
+    selection_name=memnew(LineEdit); selection_name->set_name("SelectionName"); selection_name->set_h_size_flags(SIZE_EXPAND_FILL); name_row->add_child(selection_name); selection_name->connect("text_submitted",callable_mp(this,&ECSAnimationEditor::selection_property_changed).unbind(1)); selection_name->connect("focus_exited",callable_mp(this,&ECSAnimationEditor::selection_property_changed));
     selection_length=number(String(U"长度"),0,100000,.1); bone_properties=Object::cast_to<Control>(selection_length->get_parent()); selection_length->set_allow_greater(false); selection_length->connect("value_changed",callable_mp(this,&ECSAnimationEditor::selection_property_changed).unbind(1));
 	transform_property_host=section(right,TTR("Transform"),false); transform_property_host->set_name("TransformProperties");
 	wardrobe_tools=section(right,TTR("Wardrobe"),false); wardrobe_tools->set_name("Wardrobe");
-	build_slot_tools(section(right,String(U"皮肤与插槽"),true));
+	auto *slot_host=section(right,TTR("Slots"),false); slot_property_panel=Object::cast_to<Control>(slot_host->get_parent()); slot_property_panel->set_name("ContextSlotProperties"); build_slot_tools(slot_host);
 	auto *property_host=right; right=section(property_host,String(U"动画与关键帧"),false); animation_property_panel=Object::cast_to<Control>(right->get_parent());
 	states=memnew(OptionButton); right->add_child(states); state_name=memnew(LineEdit); state_name->set_placeholder(String(U"动画名称")); right->add_child(state_name);
 	button(right,String(U"新建空白动画"),23); button(right,String(U"复制为新动画"),7); button(right,String(U"重命名动画"),15); button(right,String(U"删除动画"),8);
 	clip_length=number(String(U"动画时长"),.01,3600,.01); clip_length->set_allow_greater(false); clip_length->set_value(1);
 	clip_loop=memnew(CheckBox); clip_loop->set_text(String(U"循环播放（走路 / 待机）")); clip_loop->set_pressed(true); right->add_child(clip_loop);
 	button(right,String(U"应用时长与循环设置"),24);
-	auto *animation_properties=right; right=section(animation_properties,String(U"事件"),true);
+	right=section(property_host,String(U"事件"),true); event_property_panel=Object::cast_to<Control>(right->get_parent());
 	event_name=memnew(LineEdit); event_name->set_placeholder(String(U"事件名称（footstep / hit）")); right->add_child(event_name);
 	event_integer=number(String(U"事件整数"),-2147483648.,2147483647.,1); event_number=number(String(U"事件数值"),-100000,100000,.01);
 	event_text=memnew(LineEdit); event_text->set_placeholder(String(U"事件文字参数")); right->add_child(event_text); button(right,String(U"在当前帧插入事件"),25);
-	right=section(animation_properties,String(U"混合与曲线"),true);
+	right=section(property_host,String(U"混合与曲线"),true); curve_property_panel=Object::cast_to<Control>(right->get_parent());
 	duration=number(String(U"过渡秒数"),0,60,.05); duration->set_value(.25); button(right,String(U"设为初始动画"),9);
 	curve_interpolation=memnew(OptionButton); curve_interpolation->add_item(String(U"阶梯曲线")); curve_interpolation->add_item(String(U"线性曲线")); curve_interpolation->add_item(String(U"三次曲线")); curve_interpolation->select(1); right->add_child(curve_interpolation);
 	curve_ease=number(String(U"缓动系数"),.05,20,.05); curve_ease->set_value(1); curve_graph=memnew(ECSAnimationCurve(this)); right->add_child(curve_graph); curve_ease->connect("value_changed",callable_mp(static_cast<CanvasItem *>(curve_graph),&CanvasItem::queue_redraw).unbind(1)); button(right,String(U"应用到选中关键帧曲线"),20);
 	right=section(property_host,String(U"蒙皮与约束"),false); setup_property_panel=Object::cast_to<Control>(right->get_parent());
 	image_tools->get_parent()->remove_child(image_tools); right->add_child(image_tools);
 	// Mesh editing belongs to attachment properties, not the global application toolbar.
-	image_tools->remove_child(mesh_edit); right->add_child(mesh_edit);
+	image_tools->remove_child(mesh_edit);
+    for(int i=0;i<image_tools->get_child_count();i++) { contextual_control(Object::cast_to<Control>(image_tools->get_child(i)),i==0?INSPECT_RIG|INSPECT_BONE|INSPECT_IMAGE:INSPECT_IMAGE,true); }
+    auto *mesh_row=memnew(HBoxContainer); right->add_child(mesh_row); mesh_row->add_child(mesh_edit);
+    mesh_edit_behavior=memnew(OptionButton); mesh_edit_behavior->set_name("MeshEditBehavior");
+    mesh_edit_behavior->add_item(TTR("Adjust mesh")); mesh_edit_behavior->add_item(TTR("Deform mesh"));
+    mesh_edit_behavior->set_tooltip_text(TTR("Adjust mesh updates texture coordinates and weights. Moving the outline changes the crop. Deform mesh keeps texture coordinates fixed and stretches the image."));
+    mesh_edit_behavior->set_h_size_flags(SIZE_EXPAND_FILL); mesh_row->add_child(mesh_edit_behavior); mesh_edit_behavior->hide();
+    mesh_edit_behavior->connect("item_selected",callable_mp(this,&ECSAnimationEditor::mesh_behavior_selected));
+	contextual_control(mesh_row,INSPECT_IMAGE,true);
 	button(right,String(U"绑定当前骨架姿态"),11);
+	contextual_control(Object::cast_to<Control>(right->get_child(right->get_child_count()-1)),INSPECT_RIG,true);
 	brush_enabled=memnew(CheckBox); brush_enabled->set_text(String(U"权重笔刷（设置模式）")); right->add_child(brush_enabled); brush_enabled->connect("toggled",callable_mp(this,&ECSAnimationEditor::configure_brush).unbind(1));
 	brush_bone=memnew(OptionButton); right->add_child(brush_bone); brush_bone->connect("item_selected",callable_mp(this,&ECSAnimationEditor::configure_brush).unbind(1));
 	brush_radius=number(String(U"笔刷半径"),1,300,1); brush_radius->set_value(60); brush_radius->set_allow_greater(false); brush_strength=number(String(U"笔刷强度"),.01,1,.01); brush_strength->set_value(.15); brush_strength->set_allow_greater(false);
 	brush_radius->connect("value_changed",callable_mp(this,&ECSAnimationEditor::configure_brush).unbind(1)); brush_strength->connect("value_changed",callable_mp(this,&ECSAnimationEditor::configure_brush).unbind(1));
+    contextual_control(brush_enabled,INSPECT_IMAGE,true); contextual_control(brush_bone,INSPECT_IMAGE,true);
+    contextual_control(Object::cast_to<Control>(brush_radius->get_parent()),INSPECT_IMAGE,true); contextual_control(Object::cast_to<Control>(brush_strength->get_parent()),INSPECT_IMAGE,true);
+	int ik_start=right->get_child_count();
 	ik_x=number(String(U"IK 目标 X"),-100000,100000,1); ik_y=number(String(U"IK 目标 Y"),-100000,100000,1); ik_length=number(String(U"IK 链长度"),1,16,1); ik_length->set_value(2); ik_length->set_allow_greater(false); button(right,String(U"设置所选骨骼的 IK"),21); button(right,String(U"移除骨架 IK"),22);
+    for(int i=ik_start;i<right->get_child_count();i++) { contextual_control(Object::cast_to<Control>(right->get_child(i)),INSPECT_BONE,true); }
 	feedback=memnew(Label); feedback->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART); feedback->set_text(String(U"设置模式编辑绑定姿态；动画模式编辑关键帧。保存写入当前 ECS 场景。")); add_child(feedback);
 	curve_graph->get_parent()->remove_child(curve_graph); bottom->add_child(curve_graph); curve_graph->set_custom_minimum_size(Size2(400,190)); curve_graph->set_v_size_flags(SIZE_EXPAND_FILL); curve_graph->hide();
     Vector<Node *> property_nodes; property_nodes.push_back(property_host);
@@ -595,6 +622,7 @@ void ECSAnimationEditor::toggle_authoring_mode() {
 	set_mode(animation_mode ? 0 : 1);
 }
 void ECSAnimationEditor::set_mode(int mode) {
+    inspector_selection.erase("key"); if(mode==0) { inspector_selection.erase("animation"); inspector_selection.erase("event"); }
 	stop_preview(); if(mode==1 && canvas_tools[2] && (canvas_tools[2]->is_pressed() || canvas_tools[1]->is_pressed())) { canvas_tool_action(1); } animation_mode=mode==1;  mode_button->set_button_icon(skeleton_workspace_icon(animation_mode?"mode_animation":"mode_setup")); mode_button->set_text(animation_mode?TTR("Animate"):TTR("Rig")); mode_button->set_pressed_no_signal(animation_mode);
 	mode_button->set_tooltip_text(animation_mode ? TTR("Switch to rig editing") : TTR("Switch to animation editing"));
 	for(Button *button:compensation_tools) { if(button) { button->set_disabled(animation_mode); } }
@@ -648,17 +676,20 @@ void ECSAnimationEditor::hierarchy_selected() {
     if(refreshing || !hierarchy->get_selected()) { return; }
     TreeItem *selected=hierarchy->get_selected(); Variant metadata=selected->get_metadata(0);
     if(metadata.get_type()!=Variant::DICTIONARY) { select_target(metadata); return; }
-    Dictionary slot=metadata; select_target(slot["rig"]);
-    if(slot.has("skin")) { for(int i=0;i<skin_choice->get_item_count();i++) { if(skin_choice->get_item_text(i)==String(slot["skin"])) { skin_choice->select(i);slot_action(0);break; } } }
-    if(slot.has("slot")) { for(int i=0;i<slot_choice->get_item_count();i++) { if(slot_choice->get_item_text(i)==String(slot["slot"])) { slot_choice->select(i); break; } } }
-    refresh_slot_tools();
-    if(slot.has("placeholder")) { attachment_name_edit->set_text(slot["placeholder"]); for(int i=0;i<attachment_choice->get_item_count();i++) { if(String(attachment_choice->get_item_metadata(i))==String(slot["placeholder"])) { attachment_choice->select(i); break; } } }
-    Object::cast_to<FoldableContainer>(skin_choice->get_parent()->get_parent()->get_parent())->set_folded(false);
-    selection_title->set_text(slot.has("skin")?String(U"皮肤：")+String(slot["skin"]):slot.has("slot")?String(U"插槽：")+String(slot["slot"]):String(U"皮肤设置"));
+    select_inspector_item(metadata);
+}
+void ECSAnimationEditor::select_inspector_item(const Dictionary &metadata) {
+    int rig=metadata.get("rig",-1); if(scene.is_null() || rig<0 || rig>=scene->get_entities().size()) { return; }
+    select_target(rig); inspector_selection=metadata.duplicate();
+    attachment_name_edit->clear(); skin_name_edit->clear(); slot_name_edit->clear();
+    refresh_slot_tools(); refresh_selection_properties();
+    property_scroll->set_v_scroll(0);
+    Object::cast_to<FoldableContainer>(slot_property_panel)->set_folded(false);
 }
 void ECSAnimationEditor::choose_animation(int index) {
 	if(!animation_mode || index<0 || index>=animation_list->get_item_count()) { return; }
 	playing=false; editing_state=animation_list->get_item_metadata(index); selected_key=Vector2i(-1,-1); refresh_tracks(); Ref<Animation> clip=current_clip(); loop_start->set_value(0); if(clip.is_valid()) { loop_end->set_value(Math::round(clip->get_length()*timeline_fps)); } seek(0);
+    inspector_selection.clear(); inspector_selection["animation"]=editing_state; refresh_selection_properties();
 }
 void ECSAnimationEditor::seek(double value) {
 	if(refreshing) { return; } playing=false; time->set_value_no_signal(MAX(0.0,value)); frame->set_value_no_signal(Math::round(MAX(0.0,value)*timeline_fps));
@@ -675,13 +706,14 @@ void ECSAnimationEditor::select_key(int track,int key) {
     if(raw.get_type()!=Variant::VECTOR3) {
         String path=clip->track_get_path(track).get_concatenated_subnames();
         if(path.begins_with("event:")) {
+            inspector_selection.clear(); inspector_selection["event"]=path.substr(6).uri_decode(); refresh_selection_properties();
             Object::cast_to<FoldableContainer>(animation_property_panel)->set_folded(false);
             Object::cast_to<FoldableContainer>(event_name->get_parent()->get_parent())->set_folded(false);
             Dictionary event=raw; event_name->set_text(event.get("name",String())); event_integer->set_value(event.get("int",0)); event_number->set_value(event.get("float",0.0)); event_text->set_text(event.get("string",String()));
             selection_title->set_text(String(U"事件：")+path.substr(6).uri_decode()); reveal_property(Object::cast_to<Control>(event_name->get_parent()));
         } else if(path.begins_with("slot:")) {
-            select_target(owner->get_selected_id());
             String name=path.get_slice(":",1).uri_decode(),field=path.get_slice(":",2);
+            Dictionary selection; selection["rig"]=owner->get_selected_id(); selection["slot"]=name; select_inspector_item(selection);
             for(int i=0;i<slot_choice->get_item_count();i++) { if(slot_choice->get_item_text(i)==name) { slot_choice->select(i); break; } }
             refresh_slot_tools(); refreshing_slots=true;
             if(field=="color" && raw.get_type()==Variant::COLOR) { slot_tint->set_pick_color(raw); }
@@ -689,7 +721,7 @@ void ECSAnimationEditor::select_key(int track,int key) {
             else if(field=="attachment") { for(int i=0;i<attachment_choice->get_item_count();i++) { if(attachment_choice->get_item_metadata(i)==raw) { attachment_choice->select(i); break; } } }
             refreshing_slots=false;
             Object::cast_to<FoldableContainer>(skin_choice->get_parent()->get_parent()->get_parent())->set_folded(false);
-            selection_title->set_text(String(U"插槽：")+name); reveal_property(slot_choice);
+            selection_title->set_text(TTR("Slot")+": "+name); reveal_property(attachment_choice);
         }
         seek(clip->track_get_key_time(track,key)); return;
     }
@@ -698,6 +730,7 @@ void ECSAnimationEditor::select_key(int track,int key) {
 	if(track<targets.size()) { select_target(targets[track]); }
 	String field=clip->track_get_path(track).get_concatenated_subnames(); for(int i=0;i<property->get_item_count();i++) { if(property->get_item_text(i)==field) { property->select(i); } }
 	x->set_value(value.x); y->set_value(value.y); z->set_value(value.z); curve_ease->set_value(clip->track_get_key_transition(track,key)); curve_interpolation->select(MIN(2,int(clip->track_get_interpolation_type(track)))); seek(clip->track_get_key_time(track,key));
+    inspector_selection["key"]=true; refresh_inspector_context();
 }
 void ECSAnimationEditor::move_key(int track,int key,double value) {
 	Ref<Animation> source=current_clip(); if(timeline_locked || source.is_null() || track<0 || track>=source->get_track_count() || key<0 || key>=source->track_get_key_count(track)) { return; }
@@ -729,6 +762,9 @@ void ECSAnimationEditor::select_target(int index) {
 		int brush_index=brush_bone->get_item_index(index); if(brush_index>=0) { brush_bone->select(brush_index); configure_brush(); }
 		local_canvas->edit_scene(scene,image_selection); return;
 	}
+    if(selection_name->has_focus()) { selection_name->release_focus(); }
+    inspector_selection.clear();
+    property_scroll->set_v_scroll(0); pending_property_reveal=nullptr;
 	if(chosen.has("polygon_2d")) { image_selection=index; } else { brush_enabled->set_pressed(false); mesh_edit->set_pressed(false); }
 	int rig=find_rig(index); if(rig>=0 && owner->get_selected_id()!=rig) { owner->select(rig); refresh_tracks(); }
 	if(!navigating_history && (selection_history_cursor<0 || selection_history[selection_history_cursor]!=index)) {
@@ -750,11 +786,59 @@ void ECSAnimationEditor::select_target(int index) {
 	x->set_value(value.x); y->set_value(value.y); z->set_value(value.z); selection_title->set_text((e.has("bone_2d")?String(U"骨骼："):e.has("polygon_2d")?String(U"图片："):String(U"骨架："))+String(e.get("name","Entity"))); refresh_canvas_values(); refresh_selection_properties(); refresh_slot_tools();
     if(!animation_mode && canvas_tools[1]->is_pressed() && chosen.has("polygon_2d")) { image_action(3); }
 }
+bool ECSAnimationEditor::run_inspector_self_test() {
+    Ref<ECSScene> saved=scene; bool mode=animation_mode; bool standalone=independent_project; independent_project=false;
+    Ref<ECSScene> test; test.instantiate(); Array entities;
+    Dictionary root,bone,image,definition,slot,skin,named,skins;
+    root["name"]="Inspector Rig"; root["parent"]=-1;
+    bone["name"]="Head Bone"; bone["parent"]=0; Dictionary bone_data; bone_data["length"]=80.; bone["bone_2d"]=bone_data;
+    image["name"]="Head Image"; image["parent"]=1; Dictionary polygon; polygon["polygon"]=PackedVector2Array({Vector2(),Vector2(10,0),Vector2(0,10)}); image["polygon_2d"]=polygon;
+    definition["bones"]=PackedInt64Array({1}); slot["name"]="Head"; slot["bone"]=0; slot["attachment"]="face"; Array slots; slots.push_back(slot); definition["slots"]=slots;
+    named["face"]=2; skin["Head"]=named; skins["default"]=skin; skins["Blue"]=skin.duplicate(true); definition["skins"]=skins; definition["skin"]="default"; root["skeleton_2d"]=definition;
+    entities.push_back(root); entities.push_back(bone); entities.push_back(image); test->set_entities(entities); edit_scene(test,nullptr); set_mode(0);
+    bool ok=true;
+    // Real field input: live preview must not create document edits per mouse sample.
+    select_target(1);
+    auto *number=static_cast<SkeletonScrubSpinBox *>(canvas_values[0]);
+    auto press=[&](bool down) { Ref<InputEventMouseButton> event; event.instantiate(); event->set_button_index(MouseButton::LEFT); event->set_pressed(down); event->set_position(Vector2(30,10)); number->gui_input(event); };
+    auto drag=[&](double x,double relative,bool fine=false) { Ref<InputEventMouseMotion> event; event.instantiate(); event->set_position(Vector2(x,10)); event->set_relative(Vector2(relative,0)); event->set_button_mask(MouseButtonMask::LEFT); event->set_shift_pressed(fine); number->gui_input(event); };
+    Array scrub_before=scene->get_entities().duplicate(true);
+    press(true); drag(50,20); drag(70,20);
+    ok &= canvas_scrubbing && scene->get_entities()==scrub_before && Math::is_equal_approx(number->get_value(),10./EDSCALE);
+    press(false); ok &= !canvas_scrubbing && scene->get_entities()!=scrub_before;
+    auto *scrub_undo=EditorUndoRedoManager::get_singleton(); ok &= scrub_undo->undo(); edit_scene(test,nullptr); ok &= scene->get_entities()==scrub_before;
+    ok &= scrub_undo->redo(); edit_scene(test,nullptr); double before_cancel=number->get_value(); Array after_scrub=scene->get_entities().duplicate(true);
+    press(true); drag(70,40,true); ok &= Math::is_equal_approx(number->get_value(),Math::snapped(before_cancel+1./EDSCALE,.01));
+    Ref<InputEventKey> cancel; cancel.instantiate(); cancel->set_keycode(Key::ESCAPE); cancel->set_pressed(true); number->gui_input(cancel);
+    ok &= !canvas_scrubbing && scene->get_entities()==after_scrub && Math::is_equal_approx(number->get_value(),before_cancel);
+    press(true); drag(10,-20); press(false); ok &= number->get_value()<before_cancel;
+    Array click_before=scene->get_entities().duplicate(true); press(true); press(false); ok &= number->get_line_edit()->is_editing() && scene->get_entities()==click_before;
+    number->get_line_edit()->unedit(); number->get_line_edit()->release_focus();
+    if(ok) { print_line("SKELETON_NUMBER_SCRUB_PASS left_right fine live_preview single_undo redo escape click_to_type"); }
+    select_target(1); ok &= inspector_context()==INSPECT_BONE && bone_properties->is_visible() && !mesh_edit->is_visible_in_tree();
+    select_target(2); ok &= inspector_context()==INSPECT_IMAGE && !bone_properties->is_visible() && !slot_property_panel->is_visible() && setup_property_panel->is_visible();
+    Dictionary selection; selection["rig"]=0; selection["slot"]="Head"; select_inspector_item(selection);
+    ok &= inspector_context()==INSPECT_SLOT && selection_name->get_text()=="Head" && !selection_name->is_editable() && !setup_property_panel->is_visible() && !Object::cast_to<Control>(transform_property_host->get_parent())->is_visible();
+    Array before=scene->get_entities().duplicate(true); selection_name->set_text("Must not rename the rig"); selection_property_changed(); ok &= scene->get_entities()==before; refresh_selection_properties();
+    slot_order->set_value_no_signal(9); slot_action(8);
+    ok &= inspector_context()==INSPECT_SLOT && selection_name->get_text()=="Head";
+    ok &= int(Dictionary(Array(Dictionary(Dictionary(scene->get_entities()[0])["skeleton_2d"])["slots"])[0])["z_index"])==9;
+    auto *undo=EditorUndoRedoManager::get_singleton(); ok &= undo->undo(); edit_scene(test,nullptr); ok &= inspector_context()==INSPECT_SLOT && selection_name->get_text()=="Head";
+    ok &= undo->redo(); edit_scene(test,nullptr); ok &= inspector_context()==INSPECT_SLOT;
+    selection["skin"]="Blue"; selection["placeholder"]="face"; select_inspector_item(selection);
+    ok &= inspector_context()==INSPECT_PLACEHOLDER && selection_name->get_text()=="face" && skin_attachment_target->get_selected_id()==2 && !setup_property_panel->is_visible();
+    selection.erase("slot"); selection.erase("placeholder"); before=scene->get_entities().duplicate(true); select_inspector_item(selection);
+    ok &= inspector_context()==INSPECT_SKIN && selection_name->get_text()=="Blue" && scene->get_entities()==before;
+    set_mode(1); select_target(2); ok &= !animation_property_panel->is_visible() && !setup_property_panel->is_visible();
+    inspector_selection["animation"]="Test"; refresh_selection_properties(); ok &= animation_property_panel->is_visible() && !slot_property_panel->is_visible();
+    edit_scene(saved,nullptr); set_mode(mode?1:0); independent_project=standalone;
+    print_line(ok?"SKELETON_CONTEXT_INSPECTOR_PASS bone image slot skin placeholder safe_name undo_redo animation":"SKELETON_CONTEXT_INSPECTOR_FAIL"); return ok;
+}
 void ECSAnimationEditor::edit_scene(const Ref<ECSScene> &value,ECSUICanvasEditor *) {
 	++skeleton_ai_revision;
 	if(independent_project && scene!=value) { return; }
 	refreshing=true; int previous=owner->get_selected_id(), previous_target=target->get_selected_id(), previous_brush=brush_bone->get_selected_id(); bool different=scene!=value;
-	if(different) { selection_history.clear(); selection_history_cursor=-1; timeline->reset_view(); image_selection=-1; mesh_edit->set_pressed(false); brush_enabled->set_pressed(false); editing_state=String(); playing=false; selected_key=Vector2i(-1,-1); }
+	if(different) { inspector_selection.clear(); selection_history.clear(); selection_history_cursor=-1; timeline->reset_view(); image_selection=-1; mesh_edit->set_pressed(false); brush_enabled->set_pressed(false); editing_state=String(); playing=false; selected_key=Vector2i(-1,-1); }
 	scene=value; static_cast<SkeletonAttachmentTree *>(hierarchy)->set_scene(value); canvas=local_canvas; local_canvas->edit_scene(value,MAX(0,previous_target)); local_canvas->set_keyframe_edit_mode(animation_mode);
 	owner->clear(); target->clear(); hierarchy->clear(); brush_bone->clear();
 	if(scene.is_null()) { animation_list->clear(); refreshing=false; return; }
@@ -993,6 +1077,6 @@ bool ECSAnimationEditor::run_self_test() {
 	ok &= verify(undo->undo() && scene->get_entities().size()==image_count, __LINE__); edit_scene(scene,nullptr); set_mode(1);
 	bool saved_independent=original_independent; pending_project_operation=-1; project_action(0); ok &= verify(independent_project && scene->get_entities().size()==2 && Vector3(Dictionary(scene->get_entities()[0])["position"])==Vector3(), __LINE__); project_action(5); ok &= verify(scene->get_entities().size()==3, __LINE__);
 	if(scene->is_connected("changed",callable_mp(this,&ECSAnimationEditor::project_changed))) { scene->disconnect("changed",callable_mp(this,&ECSAnimationEditor::project_changed)); } independent_project=false;
-	ok &= verify(run_workspace_tools_self_test(), __LINE__); ok &= verify(run_slot_hierarchy_self_test(), __LINE__); ok &= verify(workspace_docking->run_self_test(), __LINE__); edit_scene(original,view); independent_project=saved_independent; if(saved_independent) { scene->connect("changed",callable_mp(this,&ECSAnimationEditor::project_changed)); } if(ok) { print_line("ECS_ANIMATION_AUTHOR_PASS mesh_subdivision binding_selection mesh_drag_undo_cancel mesh_save_reload curve weight_stroke_undo_cancel weight_normalization spine_json atlas weighted_mesh import_roundtrip new_project add_bone mode_switch pose_keys_without_rest_mutation key_insert key_move undo_redo save_reload named_clip rename auto_weights valid_scene"); } return ok;
+	ok &= verify(run_inspector_self_test(), __LINE__); ok &= verify(run_workspace_tools_self_test(), __LINE__); ok &= verify(run_slot_hierarchy_self_test(), __LINE__); ok &= verify(workspace_docking->run_self_test(), __LINE__); edit_scene(original,view); independent_project=saved_independent; if(saved_independent) { scene->connect("changed",callable_mp(this,&ECSAnimationEditor::project_changed)); } if(ok) { print_line("ECS_ANIMATION_AUTHOR_PASS mesh_subdivision binding_selection mesh_drag_undo_cancel mesh_save_reload curve weight_stroke_undo_cancel weight_normalization spine_json atlas weighted_mesh import_roundtrip new_project add_bone mode_switch pose_keys_without_rest_mutation key_insert key_move undo_redo save_reload named_clip rename auto_weights valid_scene"); } return ok;
 }
 #endif

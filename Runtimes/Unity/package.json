@@ -1,6 +1,6 @@
 {
   "name": "com.ageskeleton.runtime",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "displayName": "AgeSkeleton Runtime",
   "description": "Portable sampled mesh animation playback for AgeSkeleton.",
   "unity": "2022.3",

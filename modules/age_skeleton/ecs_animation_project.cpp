@@ -1,3 +1,6 @@
+#include "skeleton_mesh_contour.h"
+#include "editor/themes/editor_scale.h"
+#include "skeleton_document.h"
 #include "skeleton_runtime_export.h"
 #include "modules/ecs/ecs_compact_skeleton.h"
 #ifdef TOOLS_ENABLED
@@ -6,6 +9,8 @@
 #include "ecs_spine_import.h"
 #include "core/object/callable_mp.h"
 #include "core/io/resource_loader.h"
+#include "core/io/dir_access.h"
+#include "core/os/os.h"
 #include "core/config/project_settings.h"
 #include "editor/editor_node.h"
 #include "core/io/resource_saver.h"
@@ -19,6 +24,7 @@
 #include "scene/resources/image_texture.h"
 void ECSAnimationEditor::configure_brush() {
 	local_canvas->configure_weight_brush(!animation_mode && brush_enabled->is_pressed()?brush_bone->get_selected_id():-1,brush_radius->get_value(),brush_strength->get_value());
+    refresh_inspector_context();
 }
 void ECSAnimationEditor::commit_entities(const Array &entities,const String &label) {
 	Ref<ECSScene> check; check.instantiate(); check->set_entities(entities); if(check->instantiate().is_null()) { feedback->set_text(String(U"配置无效，未修改工程。")); return; }
@@ -33,6 +39,15 @@ void ECSAnimationEditor::adopt_project(const Ref<ECSScene> &value) {
 void ECSAnimationEditor::project_changed() { edit_scene(scene,nullptr); }
 void ECSAnimationEditor::confirm_project_action() { int operation=pending_project_operation; pending_project_operation=-1; project_action(operation); }
 void ECSAnimationEditor::project_action(int operation) {
+    if(operation==12) {
+        String path=scene.is_valid()?scene->get_path():String();
+        if(path.is_empty()) { feedback->set_text(TTR("Save the project first to open its folder.")); return; }
+        String directory=ProjectSettings::get_singleton()->globalize_path(path.get_base_dir());
+        if(!DirAccess::exists(directory) || OS::get_singleton()->shell_show_in_file_manager(directory,true)!=OK) {
+            feedback->set_text(TTR("Could not open the project folder.")+" "+directory);
+        }
+        return;
+    }
 	if(operation==11) { open_preferences(); return; }
 	if(operation==8) { open_asset_export(); return; }
 	if(operation==8) {
@@ -47,7 +62,7 @@ void ECSAnimationEditor::project_action(int operation) {
 		root["name"]="Skeleton2D"; root["position"]=Vector3(); rig["bones"]=PackedInt64Array({1}); root["skeleton_2d"]=rig;
 		bone["name"]="Root Bone"; bone["parent"]=0; definition["length"]=100.0; bone["bone_2d"]=definition; entities.push_back(root); entities.push_back(bone); created->set_entities(entities); adopt_project(created); owner->select(0); select_target(1); return;
 	}
-	if(operation==2 && scene.is_valid() && !scene->get_path().is_empty()) { Error error=ResourceSaver::save(scene,scene->get_path()); feedback->set_text(error==OK?String(U"工程已保存：")+scene->get_path():String(U"保存失败：")+itos(error)); return; }
+	if(operation==2 && scene.is_valid() && scene->get_path().get_extension().to_lower()=="ageskeleton") { project_operation=2; project_file_selected(scene->get_path()); return; }
 	if(operation==4 || operation==5) {
 		if(scene.is_null()) { return; } Array entities=scene->get_entities().duplicate(true); Dictionary bone,def; def["length"]=100.0; bone["bone_2d"]=def; bone["name"]="Bone "+itos(entities.size());
 		if(operation==4) { int root_index=entities.size(); Dictionary root,rig; root["name"]="Skeleton "+itos(root_index); root["position"]=Vector3(); rig["bones"]=PackedInt64Array({root_index+1}); root["skeleton_2d"]=rig; bone["parent"]=root_index; entities.push_back(root); entities.push_back(bone); }
@@ -62,7 +77,11 @@ void ECSAnimationEditor::project_action(int operation) {
 		project_dialog->set_current_file("Skeleton.ecsrig.res");
 	} else if(operation==6) { project_dialog->set_file_mode(EditorFileDialog::FILE_MODE_OPEN_FILE); project_dialog->add_filter("*.json",String(U"Spine JSON")); }
 	else if(operation==7) { project_dialog->set_file_mode(EditorFileDialog::FILE_MODE_OPEN_FILE); project_dialog->add_filter("*.png,*.jpg,*.webp",String(U"骨骼图片")); }
-	else { project_dialog->set_file_mode(operation==1?EditorFileDialog::FILE_MODE_OPEN_FILE:EditorFileDialog::FILE_MODE_SAVE_FILE); project_dialog->add_filter("*.tres",String(U"AgeChaos 骨骼工程")); if(operation!=1) { project_dialog->set_current_file("Skeleton.ecsrig.tres"); } }
+	else { project_dialog->set_file_mode(operation==1?EditorFileDialog::FILE_MODE_OPEN_FILE:EditorFileDialog::FILE_MODE_SAVE_FILE); project_dialog->add_filter("*.ageskeleton",TTR("AgeSkeleton Project")); if(operation==1) { project_dialog->add_filter("*.tres,*.res",TTR("Legacy skeleton project")); } else { String name=scene.is_valid()?scene->get_path().get_file().get_basename().trim_suffix(".ecsrig"):String(); project_dialog->set_current_file((name.is_empty()?String("Skeleton"):name)+".ageskeleton"); } }
+	if(operation==1 || operation==2 || operation==3) {
+        String current=scene.is_valid()?scene->get_path():String();
+        project_dialog->set_current_dir(current.is_empty()?OS::get_singleton()->get_system_dir(OS::SYSTEM_DIR_DOCUMENTS):ProjectSettings::get_singleton()->globalize_path(current.get_base_dir()));
+    }
 	project_dialog->popup_centered_ratio(.7);
 }
 void ECSAnimationEditor::project_file_selected(const String &path) {
@@ -82,12 +101,15 @@ void ECSAnimationEditor::project_file_selected(const String &path) {
 		return;
 	}
 	if(project_operation==6) { String report; Ref<ECSScene> imported=ecs_import_spine_json(path,report); if(imported.is_valid()) { adopt_project(imported); } feedback->set_text(report); return; }
-	if(project_operation==1) { Ref<ECSScene> loaded=ResourceLoader::load(path,"ECSScene",ResourceLoader::CACHE_MODE_IGNORE); if(loaded.is_null() || loaded->instantiate().is_null()) { feedback->set_text(String(U"不是有效的 AgeChaos 骨骼工程。")); return; } adopt_project(loaded); return; }
+	if(project_operation==1) { open_document(path); return; }
 	if(project_operation==7) {
 		if(scene.is_null()) { return; } Ref<Image> image=Image::load_from_file(path); if(image.is_null()) { feedback->set_text(String(U"图片加载失败。")); return; }
 		Array entities=scene->get_entities().duplicate(true); Dictionary e,p; e["name"]=path.get_file(); e["parent"]=target->get_selected_id(); float w=image->get_width(),h=image->get_height(); p["polygon"]=PackedVector2Array({Vector2(-w/2,-h/2),Vector2(w/2,-h/2),Vector2(w/2,h/2),Vector2(-w/2,h/2)}); p["uv"]=PackedVector2Array({Vector2(0,0),Vector2(1,0),Vector2(1,1),Vector2(0,1)}); p["texture"]=ImageTexture::create_from_image(image); e["polygon_2d"]=p; entities.push_back(e); int added=entities.size()-1; commit_entities(entities,String(U"添加骨骼图片")); select_target(added); return;
 	}
-	if(scene.is_null()) { return; } Error error=ResourceSaver::save(scene,path); if(error==OK) { scene->set_path(path); feedback->set_text(String(U"工程已保存：")+path); } else { feedback->set_text(String(U"保存失败：")+itos(error)); }
+	if(scene.is_null()) { return; }
+    String report; Error error=SkeletonDocument::save(scene,path,report);
+    if(error==OK) { scene->set_path(ProjectSettings::get_singleton()->globalize_path(path),true); feedback->set_text(TTR("Project saved.")+" "+scene->get_path()); }
+    else { feedback->set_text(TTR("Could not save project.")+" "+report); }
 }
 
 int ECSAnimationEditor::find_rig(int entity) const {
@@ -102,9 +124,17 @@ int ECSAnimationEditor::find_rig(int entity) const {
 	int found=-1; for(int i=0;i<entities.size();i++) { if(Dictionary(entities[i]).has("skeleton_2d")) { if(found>=0) { return -1; } found=i; } }
 	return found;
 }
+void ECSAnimationEditor::mesh_behavior_selected(int mode) {
+    local_canvas->set_mesh_preserve_texture(mode==0);
+}
 void ECSAnimationEditor::mesh_toggled(bool enabled) {
 	if(enabled) { brush_enabled->set_pressed(false); }
 	local_canvas->set_mesh_edit_mode(enabled && !animation_mode);
+    mesh_edit_behavior->set_visible(enabled && !animation_mode);
+    if(enabled) {
+        mesh_edit_behavior->select(0); mesh_behavior_selected(0);
+        local_canvas->set_tooltip_text(TTR("Drag vertices to adjust the mesh. Double-click a triangle to add a vertex; right-click a vertex to delete it. Esc cancels the drag."));
+    } else { local_canvas->set_tooltip_text(TTR("Select a bone or image. Middle mouse pans; the wheel zooms; Esc cancels the current drag.")); }
 }
 void ECSAnimationEditor::mesh_changed(int entity,const Dictionary &polygon) {
 	if(animation_mode || scene.is_null() || entity<0 || entity>=scene->get_entities().size()) { return; }
@@ -150,6 +180,7 @@ void ECSAnimationEditor::image_action(int operation) {
 	if(scene.is_null() || selected<0 || !Dictionary(scene->get_entities()[selected]).has("polygon_2d")) { feedback->set_text(String(U"先在画布或层级树中选择图片。")); return; }
 	image_selection=selected;
 	Dictionary mesh=Dictionary(scene->get_entities()[selected])["polygon_2d"];
+	if(operation==4) { contour_entity=selected; contour_scene=scene; contour_dialog->popup_centered(Size2(500,230)*EDSCALE); return; }
 	if(operation==1) { Dictionary divided=subdivide_mesh(mesh); if(divided.is_empty()) { feedback->set_text(String(U"网格已达到细分上限。")); return; } mesh_changed(selected,divided); mesh_edit->set_pressed(true); feedback->set_text(String(U"拖动顶点；双击三角形内部加点；右键顶点删除；Esc 取消拖动。")); return; }
 	if(operation==3) {
 		
@@ -226,5 +257,48 @@ bool ECSAnimationEditor::prepare_platform_export() {
 	if(error!=OK) { feedback->set_text(String(U"无法保存发布配置：")+itos(error)); return false; }
 	feedback->set_text(String(U"已生成发布快照。选择目标平台并配置对应的 AgeChaos 导出模板。"));
 	return true;
+}
+#endif
+
+#ifdef TOOLS_ENABLED
+void ECSAnimationEditor::open_document(const String &path) {
+    String report;
+    Ref<ECSScene> loaded;
+    if(path.get_extension().to_lower()=="ageskeleton") { loaded=SkeletonDocument::load(path,report); }
+    else { loaded=ResourceLoader::load(path,"ECSScene",ResourceLoader::CACHE_MODE_IGNORE); }
+    if(loaded.is_null() || loaded->instantiate().is_null()) { feedback->set_text(TTR("Could not open project.")+" "+report); return; }
+    adopt_project(loaded);
+}
+#endif
+
+#ifdef TOOLS_ENABLED
+bool ECSAnimationEditor::generate_auto_contour(int entity,float threshold,float precision,int margin,String &error) {
+    if(animation_mode || scene.is_null() || entity<0 || entity>=scene->get_entities().size() || !Dictionary(scene->get_entities()[entity]).has("polygon_2d")) { error=TTR("Select an image attachment in setup mode."); return false; }
+    Array source_entities=scene->get_entities();
+    for(int owner_index=0;owner_index<source_entities.size();owner_index++) {
+        Dictionary definition=Dictionary(source_entities[owner_index]).get("animation",Dictionary());
+        PackedInt64Array targets=definition.get("targets",PackedInt64Array()); Array clips=Dictionary(definition.get("states",Dictionary())).values(); clips.push_back(definition.get("clip",Variant()));
+        for(const Variant &value:clips) {
+            Ref<Animation> clip=value; if(clip.is_null()) { continue; }
+            for(int track=0;track<clip->get_track_count();track++) {
+                if((track<targets.size()?targets[track]:owner_index)==entity && clip->track_get_path(track).get_concatenated_subnames()=="polygon:frame") { error=TTR("This attachment uses frame animation that replaces its mesh. Automatic contour is unavailable."); return false; }
+            }
+        }
+    }
+    Dictionary source=Dictionary(source_entities[entity])["polygon_2d"];
+    Dictionary generated=SkeletonMeshContour::generate(source,threshold,precision,margin,error);
+    if(generated.is_empty()) { return false; }
+    Array entities=scene->get_entities(); Dictionary attachment=entities[entity]; attachment["polygon_2d"]=generated;
+    Ref<ECSScene> check; check.instantiate(); check->set_entities(entities);
+    if(check->instantiate().is_null()) { error=TTR("The generated mesh is invalid. The attachment was not changed."); return false; }
+    commit_entities(entities,TTR("Generate automatic contour")); select_target(entity); mesh_edit->set_pressed(true);
+    feedback->set_text(vformat(TTR("Contour generated: %d vertices. Undo restores the previous mesh."),PackedVector2Array(generated["polygon"]).size()));
+    return true;
+}
+void ECSAnimationEditor::confirm_auto_contour() {
+    if(scene!=contour_scene) { feedback->set_text(TTR("The project changed. Select the attachment again.")); return; }
+    String error;
+    if(!generate_auto_contour(contour_entity,contour_threshold->get_value(),contour_precision->get_value(),int(contour_margin->get_value()),error)) { feedback->set_text(error); }
+    contour_scene.unref();
 }
 #endif

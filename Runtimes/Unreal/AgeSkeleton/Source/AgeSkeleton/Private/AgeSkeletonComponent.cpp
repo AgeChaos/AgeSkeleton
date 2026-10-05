@@ -56,3 +56,7 @@ void UAgeSkeletonComponent::SetPlaybackSpeed(float Speed){if(FMath::IsFinite(Spe
 bool UAgeSkeletonComponent::SetIKTarget(const FString &Bone,FVector2D Target,int32 ChainLength,float Mix,int32 Iterations,float Tolerance){bool Ok=Player->set_ik_target(TCHAR_TO_UTF8(*Bone),float(Target.X),float(Target.Y),ChainLength,Mix,Iterations,Tolerance);if(Ok)ApplyPose();return Ok;}
 bool UAgeSkeletonComponent::ClearIKTarget(const FString &Bone){bool Ok=Player->clear_ik_target(TCHAR_TO_UTF8(*Bone));if(Ok)ApplyPose();return Ok;}
 bool UAgeSkeletonComponent::GetBoneTip(const FString &Bone,FVector2D &Tip)const{std::array<float,2> Value;if(!Player->bone_tip(TCHAR_TO_UTF8(*Bone),Value))return false;Tip=FVector2D(Value[0],Value[1]);return true;}
+
+bool UAgeSkeletonComponent::CrossFade(const FString &Animation,float Duration,bool Restart){bool Ok=Player->cross_fade(TCHAR_TO_UTF8(*Animation),Duration,Restart);if(Ok)ApplyPose();return Ok;}
+bool UAgeSkeletonComponent::IsBlending()const{return Player->is_blending();}
+float UAgeSkeletonComponent::GetBlendProgress()const{return Player->blend_progress();}

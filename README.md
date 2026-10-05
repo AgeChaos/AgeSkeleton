@@ -14,7 +14,7 @@ A standalone **2D skeletal animation editor** built on Godot, with rigging, skin
 - **蒙皮 / Skinning**：图片附件、网格细分、自动绑定、权重笔刷。
 - **动画 / Animation**：时间轴、属性关键帧、插值曲线、播放与指定时间预览。
 - **组织 / Organization**：皮肤、插槽、附件与绘制顺序。
-- **工作区 / Workspace**：画布、动画片段、时间轴、层级树、属性可独立拖动停靠、合并页签或浮动；布局按工程保存。
+- **工作区 / Workspace**：画布、动画片段、时间轴、层级树、属性可独立拖动停靠、合并页签或浮动；布局保存在本机编辑器设置中。
 - **导入导出 / Import and export**：Spine JSON 导入、工程保存及资源导出；不代表兼容 Spine 的所有版本和特性。
 - **AI 操作 / AI authoring**：本地结构化接口，支持创建、编辑、验证、保存及截图；不内置大模型。
 
@@ -33,6 +33,22 @@ Moonwing includes original vector artwork, a 12-bone rig, ten skinned attachment
 左侧工具栏用于选择、移动、旋转、缩放、建骨与权重绘制；右侧属性区编辑变换并用菱形按钮插入关键帧。切换到顶栏的“动画”模式，在底部动画列表选择 Soar 或 Glide 后播放。
 
 拖动面板页签到另一面板边缘可分割停靠，拖到中间可合并，拖出工作区可成为独立窗口。页签最右侧三个点提供关闭、浮动和最大化；顶栏“面板”菜单可重新打开面板或重置布局。旋转工具拖动圆环；缩放工具拖动轴端方块调整单轴，拖动中心方块等比缩放。
+
+选中图片，在“蒙皮与约束”勾选“编辑网格”。默认“调整网格”同步修改顶点、UV 和蒙皮权重，避免固定 UV 造成的贴图拉伸；外轮廓移动会改变裁剪范围。需要主动拉伸图片时选择“变形网格”。Esc 取消当前拖动，撤销/重做同时恢复几何、UV 和权重。调整模式拒绝三角形翻折；原 UV 位于图片范围内时，也会阻止拖出图片范围。
+
+属性面板跟随当前选择：骨骼显示变换、长度和 IK；图片显示变换和蒙皮；插槽显示附件、颜色、顺序和混合；皮肤与占位符显示各自的组合或绑定工具。笔刷参数仅在启用权重笔刷后显示。选中皮肤仅查看属性，点击“应用皮肤”才切换角色外观。插槽、皮肤、占位符的名称栏用于显示实际名称，不会修改所属骨架名称；皮肤和占位符使用各自的重命名按钮。
+
+The inspector follows the selected object: bone transforms and IK, image transforms and skinning, slot appearance and draw order, or skin/placeholder bindings. Brush settings appear only while weight painting is enabled. Selecting a skin inspects it; **Apply skin** changes the active appearance. Virtual item name fields display their own names and cannot accidentally rename the skeleton.
+
+变换数值（旋转、位置、缩放、倾斜）支持横向拖调：鼠标悬浮显示左右箭头，按住左键左右拖动；Shift 微调，Esc 或右键取消，轻点进入文字输入。拖动实时预览，松手提交一次修改，可一次撤销；动画模式仍遵循自动关键帧开关。
+
+Transform values support horizontal scrubbing: drag left/right, hold Shift for fine adjustment, or press Esc/right-click to cancel. Click without dragging to type. A drag previews live and commits one undoable change on release; animation editing respects Auto Key.
+
+选中图片 → **蒙皮与约束 → 自动轮廓**，可按透明度生成网格边缘。默认轮廓简化 **4 像素**、边缘留白 **2 像素**；简化值越大，边缘点越少，留白越大，轮廓离图片越远（受原网格覆盖范围限制）。工具会去掉旧三角形产生的多余分割点，保留间隔适当的内部控制点并插值蒙皮权重，支持一次撤销恢复原网格。含逐帧替换网格动画的附件暂不允许自动重建。
+
+**Auto Contour:** select an image → Skinning and Constraints → Auto Contour. The defaults are 4 px simplification and 2 px padding. Increase simplification for fewer vertices, or padding for more room around the image, within the original mesh footprint. Spaced interior controls are retained and skin weights are interpolated. The operation is undoable; attachments with frame-replacement mesh tracks cannot be rebuilt.
+
+Enable **Edit mesh** on an image attachment. **Adjust mesh** updates texture coordinates and interpolates skin weights; moving the boundary changes the crop. **Deform mesh** intentionally keeps UVs fixed to stretch the image. Escape cancels a drag; undo/redo restores geometry, UVs and weights together. Adjust mode rejects folded triangles and out-of-image UVs for normalized image mappings.
 
 Drag a panel tab to an edge to split, to the center to merge, or outside the workspace to float. The three-dot menu controls each panel; **Panels** reopens closed panes and resets the layout. Drag the rotation ring, the scale axis squares, or the central uniform-scale handle.
 
@@ -70,11 +86,11 @@ Name skins `Group/Variant` to define parts. Each group selects one variant; a va
 
 The sample artwork and rig are original and MIT licensed. The current release packaging manifest still includes only Moonwing.
 
-## 跨引擎运行库 / Cross-engine runtimes (0.3)
+## 跨引擎运行库 / Cross-engine runtimes (0.4)
 
-源码位于 `Runtimes/`。**AgeChaos 使用原生 ECS 骨骼；Unity、Unreal、Cocos 和原版 Godot 使用采样网格格式 `ageskeleton.meshclip` v2（读取兼容 v1）。** 后者保存各帧顶点位置，运行时线性插值，支持动画播放／暂停／跳转／变速、皮肤组合与插槽显隐。导出采样保留原有 IK 和蒙皮结果。v2 额外保存骨骼矩阵和逐顶点蒙皮影响，支持运行时 CCD IK 目标及带整数／浮点／字符串参数的动画事件。任意骨骼编辑、动画混合过渡仍未实现。资源大小随顶点数、动画时长和采样率增长。它不是完整骨骼运行时的等价替代，也没有跨引擎性能领先的保证。
+源码位于 `Runtimes/`。**AgeChaos 使用原生 ECS 骨骼；Unity、Unreal、Cocos 和原版 Godot 使用采样网格格式 `ageskeleton.meshclip` v2（读取兼容 v1）。** 后者保存各帧顶点位置，运行时线性插值，支持动画播放／暂停／跳转／变速、皮肤组合与插槽显隐。导出采样保留原有 IK 和蒙皮结果。v2 额外保存骨骼矩阵和逐顶点蒙皮影响，支持运行时 CCD IK 目标及带整数／浮点／字符串参数的动画事件。支持指定时长的动画混合过渡；任意骨骼编辑仍未实现。资源大小随顶点数、动画时长和采样率增长。它不是完整骨骼运行时的等价替代，也没有跨引擎性能领先的保证。
 
-AgeChaos retains native ECS skeletal evaluation. The other engines use sampled vertex clips: IK and skinning are baked at export, then vertices interpolate during playback. Version 2 adds sampled bone matrices and per-influence local coordinates for runtime CCD IK targets, plus typed animation events. V1 reading remains supported. Arbitrary bone editing and crossfades remain unavailable. Size scales with vertices, duration and sampling rate. No performance superiority is implied.
+AgeChaos retains native ECS skeletal evaluation. The other engines use sampled vertex clips: IK and skinning are baked at export, then vertices interpolate during playback. Version 2 adds sampled bone matrices and per-influence local coordinates for runtime CCD IK targets, plus typed animation events. V1 reading remains supported. Timed animation crossfades are supported; arbitrary bone editing remains unavailable. Size scales with vertices, duration and sampling rate. No performance superiority is implied.
 
 在编辑器的 **工程 → 导出** 中选择 **引擎运行库**，再选择 **Unity / Unreal / Cocos / Godot** 页签，指定一个尚不存在的目录。输出 `skeleton.ageskel.json` 和 PNG 图集页面，包含全部动画及皮肤。导出不改变当前姿态；现有目录不会被覆盖。当前格式只接受单骨架、普通透明混合；双色着色和乒乓循环会明确拒绝，不会静默丢失。也可通过本地会话导出：
 
@@ -151,6 +167,24 @@ Windows 验收不代表 Android、iOS、Web 或其他平台验收通过。运行
 
 Windows validation does not certify Android, iOS, Web or other platforms. Original runtime code uses the same restricted commercialization license as the editor; commercial integration is prohibited; preserve the JSON parser and godot-cpp notices when distributing native libraries.
 
+### 动画混合过渡 / Animation crossfades
+
+```csharp
+// Unity: fade from the current pose into Walk over 0.3 animation seconds.
+player.CrossFade("Walk", 0.3f);
+```
+
+Godot 使用 `player.cross_fade("Walk", 0.3)`；UE5 使用 `CrossFade` 蓝图节点；Cocos 使用 `player.crossFade('Walk', 0.3)`。Unity／Cocos 提供 `IsBlending`／`isBlending` 和 `BlendProgress`／`blendProgress`；Godot 为 `is_blending()`、`get_blend_progress()`，UE5 为 `IsBlending()`、`GetBlendProgress()`。默认过渡 0.2 秒，传入 0 立即切换；`restart=false` 仅在目标就是当前动画时保留其时间。
+
+- 正常过渡期间，源动画与目标动画都继续播放。过渡中再次切换，以切换瞬间的混合姿态为固定源，避免突跳和无限叠加旧动画。
+- 暂停、速度为 0 时冻结过渡；倒放仍向目标完成过渡。过渡时钟乘以播放速度绝对值。例如时长 0.3、速度 2，在现实时间 0.15 秒完成。
+- 顶点和插槽颜色连续混合；附件选择／绘制顺序在权重达到 50% 时切换。手动皮肤、附件和隐藏设置仍然优先。
+- 只派发目标动画事件；IK 在混合姿态之后求解。暂停、Seek 等原有事件规则保持有效。
+- `Play`、`Stop`、`Seek` 取消当前过渡。非循环目标先到末尾时，保持末尾姿态直到过渡完成，再停止。
+- v1／v2 已导出数据均可使用，无须重导出。此处为采样网格的线性过渡，不是多轨道、骨骼遮罩或加法动画层；大幅反向姿态的顶点插值可能产生收缩，需要缩短过渡或增加中间动作。
+
+The outgoing and incoming clips advance together during a crossfade. Interrupted fades capture the current raw blended pose, so switches stay continuous. Fade time scales with absolute playback speed and freezes on pause or zero speed. Discrete slot keys/orders switch at 50%; manual overrides still win. Only destination events fire, and IK runs after blending. Play/Stop/Seek cancel the fade; a short non-looping destination holds its endpoint until the fade completes. Existing v1/v2 exports work unchanged. This is linear sampled-mesh crossfading, not layered/additive or masked skeletal blending; large opposing poses may shrink during interpolation.
+
 ### 运行时 IK 与事件 / Runtime IK and events
 
 - Unity：`SetIKTarget(bone, x, y, chainLength, mix)` / `ClearIKTarget(bone)` / `GetBoneTip(bone)`；订阅 `AnimationEvent`。
@@ -162,7 +196,7 @@ Windows validation does not certify Android, iOS, Web or other platforms. Origin
 
 事件保留原始关键帧时间，支持正放、倒放及跨多轮循环；暂停、零步长和跳转不补发事件。重新播放后的第一次非零更新包含起点事件；循环边界同时存在尾帧和首帧事件时两者均触发。一次更新超过 4096 次事件会拒绝该步，保持时间不变；应使用较小步长。事件仅在相应次更新派发，修改皮肤或 IK 不触发事件。
 
-IK targets use exported skeleton-local pixels (Y down), independent of world transforms. Events preserve authored times and typed payloads; forward/reverse looping is supported. Pause, zero steps and seek do not emit skipped events. More than 4096 event occurrences in one update rejects the step atomically. V1 needs re-export for IK and events. Crossfades and arbitrary bone editing remain unavailable.
+IK targets use exported skeleton-local pixels (Y down), independent of world transforms. Events preserve authored times and typed payloads; forward/reverse looping is supported. Pause, zero steps and seek do not emit skipped events. More than 4096 event occurrences in one update rejects the step atomically. V1 needs re-export for IK and events. Crossfades are supported; arbitrary bone editing remains unavailable.
 
 ## 直接使用 / Run the existing build
 
@@ -172,7 +206,7 @@ IK targets use exported skeleton-local pixels (Y down), independent of world tra
 AgeSkeleton.exe
 ```
 
-双击该程序即可启动。如果使用源码构建，可在源码根目录运行以下命令；示例数据目录须与编译时一致，并已包含构建产物和工程。
+双击该程序即可启动。顶部模式按钮（骨架／动画）位于工程菜单之前；通过 **工程 → 打开项目目录** 打开当前 `.ageskeleton` 所在文件夹；新工程需要先保存。如果使用源码构建，可在源码根目录运行以下命令；示例数据目录须与编译时一致，并已包含构建产物和工程。
 
 Run these commands from the source checkout:
 
@@ -184,10 +218,32 @@ python tools/open_editor.py
 打开其他已有工程 / Open another project:
 
 ```powershell
-python tools/open_editor.py --project "../MyProjects/MySkeleton"
+python tools/open_editor.py --project "../MyProjects/MySkeleton/MySkeleton.ageskeleton"
 ```
 
-指定目录必须包含 `project.godot`。`AgeSkeleton.console.exe` 是带控制台输出的伴随启动器，须与 `AgeSkeleton.exe` 放在同一目录。
+新工程只需一个 `.ageskeleton` 文件和 `images/` 目录，不需要 `project.godot`。旧工作区仍可以通过 `--project <旧工作区目录>` 打开并另存为新格式。`AgeSkeleton.console.exe` 是带控制台输出的伴随启动器，须与 `AgeSkeleton.exe` 放在同一目录。
+
+### 独立工程文件 / Portable documents
+
+```text
+MyCharacter/
+    MyCharacter.ageskeleton
+    images/
+        body.png
+        head.png
+```
+
+工程文件包含骨骼、插槽、皮肤、权重与动画数据；图片保存在 `images/`，使用相对路径。搬移或分享时带上整个文件夹。保存时不覆盖同名但内容不同的图片；删除附件后不会自动删除图片，以免丢失素材。旧 `.tres` 工程请在原工作区打开，再通过“另存为”转换。
+
+The compressed document stores rig, slot, skin, weight and animation data; PNG images are referenced relative to the document. Move/share the entire folder. Conflicting image files are preserved, and unused images are not deleted automatically. Open legacy `.tres` files in their original workspace before saving a portable copy.
+
+Windows 双击打开及文件图标注册（当前用户，无需管理员）：
+
+```powershell
+python tools/register_file_type.py
+```
+
+Register the current build for `.ageskeleton` files and its file icon using the command above. If you move the editor executable, run it again with `--binary <new path>`. Windows may ask you to choose AgeSkeleton if another application already owns a user-selected default.
 
 ### 基本制作流程 / Authoring workflow
 
@@ -218,7 +274,7 @@ python tools/build.py --jobs 8
 python tools/open_editor.py
 ```
 
-`--jobs` 指定并行编译任务数，可按内存和 CPU 情况调整。构建成功后，程序生成在项目内的 `bin/`：`AgeSkeleton.exe` 和 `AgeSkeleton.console.exe`。编译中间文件位于 `bin/obj/`。缺少默认工作区时会在数据目录创建空白工程，不覆盖已有工程。
+`--jobs` 指定并行编译任务数，可按内存和 CPU 情况调整。构建成功后，程序生成在项目内的 `bin/`：`AgeSkeleton.exe` 和 `AgeSkeleton.console.exe`。编译中间文件位于 `bin/obj/`。编辑器内部缓存位于用户应用数据目录，不会写进作品目录；已有工作区不会被修改。
 
 Executables and compiler output stay in the local `bin/` directory. Existing workspace projects are preserved.
 
@@ -228,9 +284,9 @@ Executables and compiler output stay in the local `bin/` directory. Existing wor
 python tools/build.py --dry-run
 ```
 
-`bin/` 是实际目录，不创建快捷方式或目录联接。构建脚本生成 `bin/workspace.path`，记录默认工作区位置，因此直接双击 EXE 也能打开外部工作区。命令行 `--path` 可覆盖此设置。
+`bin/` 是实际目录，不创建快捷方式或目录联接。直接双击 EXE 新建空白工程；启动参数可以传入 `.ageskeleton` 文件。Windows 内部宿主和缓存位于 `%APPDATA%/AgeSkeleton/EditorHost`，旧的 `workspace.path` 不再决定默认作品。命令行 `--path` 仍用于打开旧 Godot 工作区。
 
-`bin/` is a real local directory. `workspace.path` selects the default project without directory links; an explicit `--path` takes precedence.
+The application keeps its host/cache in the user application-data directory. Open an `.ageskeleton` document directly; `--path` remains available for legacy Godot workspaces.
 
 ### 自定义数据目录 / Custom data directory
 
@@ -264,7 +320,7 @@ AgeSkeleton/
 ```text
 AgeSkeletonData/
 ├─ Project/
-│  ├─ Workspace/               默认工作区 / Default workspace
+│  ├─ Workspace/               保留的旧工作区 / Legacy workspace
 │  └─ AI-Authoring-Example/     本地 AI 案例 / Local AI example
 ├─ Build/
 │  ├─ SDK/                     本地 SDK 工具 / Local SDK tooling

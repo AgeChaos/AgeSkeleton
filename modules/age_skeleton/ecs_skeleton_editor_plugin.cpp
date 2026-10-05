@@ -1,3 +1,4 @@
+#include "skeleton_mesh_contour.h"
 #ifdef TOOLS_ENABLED
 #include "ecs_skeleton_editor_plugin.h"
 #include "ecs_animation_editor.h"
@@ -28,6 +29,8 @@ void ECSSkeletonEditorPlugin::open_workspace() {
 	String path=GLOBAL_GET("ecs/run/scene");
 	if(!path.is_empty()) { scene=ResourceLoader::load(path,"ECSScene"); }
 	workspace->start_independent_project(scene);
+	const List<String> arguments=OS::get_singleton()->get_cmdline_user_args();
+	for(auto *arg=arguments.front();arg;arg=arg->next()) { if(arg->get()=="--open-document" && arg->next()) { workspace->open_document(arg->next()->get()); break; } }
 	print_line("AGE_SKELETON_READY");
 	if(OS::get_singleton()->get_cmdline_user_args().find("--skeleton-self-test")) {
 		get_tree()->create_timer(1)->connect("timeout",callable_mp(this,&ECSSkeletonEditorPlugin::self_test));
@@ -38,6 +41,7 @@ bool skeleton_image_codec_self_test();
 bool skeleton_runtime_atlas_self_test();
 void ECSSkeletonEditorPlugin::self_test() {
 	bool ok=skeleton_image_codec_self_test();
+    ok &= SkeletonMeshContour::self_test();
 	ok &= ECSWorld::skeleton_slots_self_test();
 	ok &= ECSWorld::skeleton_animation_channels_self_test();
 	ok &= workspace->run_self_test();

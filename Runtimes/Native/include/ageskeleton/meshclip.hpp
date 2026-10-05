@@ -71,6 +71,21 @@ inline bool load(const std::string &source,Data &result,std::string &error) {
 
 class Player {
     Data data_;MotionPose motion_;bool event_start_=false;int clip_=-1;std::vector<std::string> active_,overrides_;std::vector<bool> overridden_,hidden_;
+    Frame pose_,source_pose_;int source_clip_=-1;float source_time_=0;
+    double fade_duration_=0,fade_elapsed_=0;
+    void cancel_fade(){fade_duration_=fade_elapsed_=0;source_clip_=-1;}
+    static float clip_time(const Clip &c,double at){return float(c.loop?std::fmod(std::fmod(at,c.duration)+c.duration,c.duration):std::clamp(at,0.0,double(c.duration)));}
+    static void blend_numbers(const std::vector<float>&a,const std::vector<float>&b,float t,std::vector<float>&out){out.resize(a.size());for(size_t i=0;i<a.size();++i)out[i]=t<=0?a[i]:t>=1?b[i]:a[i]+(b[i]-a[i])*t;}
+    static void blend_pose(const Frame&a,const Frame&b,float t,bool target_keys,Frame&out){
+        blend_numbers(a.positions,b.positions,t,out.positions);blend_numbers(a.colors,b.colors,t,out.colors);
+        blend_numbers(a.matrices,b.matrices,t,out.matrices);blend_numbers(a.influence_positions,b.influence_positions,t,out.influence_positions);
+        out.keys=target_keys?b.keys:a.keys;out.orders=target_keys?b.orders:a.orders;
+    }
+    void sample_pose(int clip,float at,Frame &out)const{
+        const Frame *a=&data_.rest,*b=a;float alpha=0;
+        if(clip>=0){const auto &frames=data_.clips[clip].frames;auto it=std::upper_bound(frames.begin(),frames.end(),at,[](float t,const Frame&f){return t<f.time;});size_t index=it==frames.begin()?0:size_t(it-frames.begin()-1);a=&frames[index];b=&frames[std::min(index+1,frames.size()-1)];alpha=b->time>a->time?(at-a->time)/(b->time-a->time):0;}
+        blend_pose(*a,*b,alpha,false,out);
+    }
     int skin_index(const std::string &name)const {for(size_t i=0;i<data_.skins.size();++i)if(data_.skins[i].name==name)return int(i);return -1;}
     int slot_index(const std::string &name)const {auto i=std::find(data_.slots.begin(),data_.slots.end(),name);return i==data_.slots.end()?-1:int(i-data_.slots.begin());}
     int resolve(const std::string &skin,int slot,const std::string &key,int prior)const {int index=skin_index(skin);if(index>=0)for(const auto &b:data_.skins[index].bindings)if(b.slot==slot&&b.key==key)prior=b.attachment;return prior;}
@@ -78,11 +93,35 @@ public:
     std::vector<float> positions,colors;std::vector<bool> visible;std::vector<int> orders;bool playing=false;float speed=1,time=0;
     std::vector<RuntimeEvent> events;
     const Data &data()const{return data_;}
-    bool load_json(const std::string &json,std::string &error){Data next;if(!load(json,next,error))return false;data_=std::move(next);motion_.reset(data_.rig);events.clear();event_start_=false;clip_=-1;time=0;playing=false;speed=1;active_=data_.default_skins;overrides_.assign(data_.slots.size(),"");overridden_.assign(data_.slots.size(),false);hidden_.assign(data_.slots.size(),false);positions.resize(data_.vertex_count*2);colors.resize(data_.attachments.size()*4);visible.resize(data_.attachments.size());orders.resize(data_.attachments.size());evaluate();return true;}
-    bool play(const std::string &name,bool restart=true){for(size_t i=0;i<data_.clips.size();++i)if(data_.clips[i].name==name){if(restart||clip_!=int(i)){time=0;event_start_=true;}events.clear();clip_=int(i);playing=true;evaluate();return true;}return false;}
-    void stop(){events.clear();event_start_=false;clip_=-1;playing=false;time=0;if(!positions.empty())evaluate();}
-    bool seek(float at){if(!std::isfinite(at))return false;events.clear();event_start_=false;time=clip_<0?0:std::clamp(at,0.0f,data_.clips[clip_].duration);if(!positions.empty())evaluate();return true;}
-    bool update(double delta){events.clear();if(!std::isfinite(delta)||delta<0||!std::isfinite(speed))return false;events.clear();if(!playing||clip_<0)return true;const Clip &c=data_.clips[clip_];double next=time+delta*speed;if(!std::isfinite(next))return false;double to=c.loop?next:std::clamp(next,0.0,double(c.duration));if(!collect_events(c.events,c.name,c.duration,c.loop,time,to,event_start_,events))return false;if(to!=time)event_start_=false;if(c.loop)to=std::fmod(std::fmod(to,c.duration)+c.duration,c.duration);else if(next>=c.duration||next<0)playing=false;time=float(to);evaluate();return true;}
+    bool load_json(const std::string &json,std::string &error){Data next;if(!load(json,next,error))return false;data_=std::move(next);cancel_fade();pose_=data_.rest;source_pose_=data_.rest;motion_.reset(data_.rig);events.clear();event_start_=false;clip_=-1;time=0;playing=false;speed=1;active_=data_.default_skins;overrides_.assign(data_.slots.size(),"");overridden_.assign(data_.slots.size(),false);hidden_.assign(data_.slots.size(),false);positions.resize(data_.vertex_count*2);colors.resize(data_.attachments.size()*4);visible.resize(data_.attachments.size());orders.resize(data_.attachments.size());evaluate();return true;}
+    bool play(const std::string &name,bool restart=true){for(size_t i=0;i<data_.clips.size();++i)if(data_.clips[i].name==name){cancel_fade();if(restart||clip_!=int(i)){time=0;event_start_=true;}events.clear();clip_=int(i);playing=true;evaluate();return true;}return false;}
+    bool is_blending()const{return fade_duration_>0;}
+    float blend_progress()const{return is_blending()?float(fade_elapsed_/fade_duration_):1.0f;}
+    bool cross_fade(const std::string &name,double duration=.2,bool restart=true){
+        if(!std::isfinite(duration)||duration<0)return false;
+        int next=-1;for(size_t i=0;i<data_.clips.size();++i)if(data_.clips[i].name==name){next=int(i);break;}if(next<0)return false;
+        if(duration==0)return play(name,restart);
+        evaluate();source_pose_=pose_;source_clip_=!is_blending()&&playing?clip_:-1;source_time_=time;
+        if(restart||next!=clip_){time=0;event_start_=true;}
+        clip_=next;fade_duration_=duration;fade_elapsed_=0;events.clear();playing=true;evaluate();return true;
+    }
+    void stop(){cancel_fade();events.clear();event_start_=false;clip_=-1;playing=false;time=0;if(!positions.empty())evaluate();}
+    bool seek(float at){if(!std::isfinite(at))return false;cancel_fade();events.clear();event_start_=false;time=clip_<0?0:std::clamp(at,0.0f,data_.clips[clip_].duration);if(!positions.empty())evaluate();return true;}
+    bool update(double delta){
+        events.clear();if(!std::isfinite(delta)||delta<0||!std::isfinite(speed))return false;if(!playing||clip_<0)return true;
+        const Clip &c=data_.clips[clip_];double step=delta*speed,next=time+step;if(!std::isfinite(next))return false;
+        double to=c.loop?next:std::clamp(next,0.0,double(c.duration));
+        if(!collect_events(c.events,c.name,c.duration,c.loop,time,to,event_start_,events))return false;
+        if(to!=time)event_start_=false;
+        if(is_blending()){
+            if(source_clip_>=0)source_time_=clip_time(data_.clips[source_clip_],source_time_+step);
+            fade_elapsed_=std::min(fade_duration_,fade_elapsed_+std::abs(step));
+            if(fade_elapsed_>=fade_duration_)cancel_fade();
+        }
+        time=clip_time(c,next);
+        if(!c.loop&&!is_blending()&&((speed>0&&next>=c.duration)||(speed<0&&next<=0)))playing=false;
+        evaluate();return true;
+    }
     bool set_ik_target(const std::string&tip,float x,float y,int chain=2,float mix=1,int iterations=24,float tolerance=.1f){if(!motion_.set_target(data_.rig,tip,x,y,chain,mix,iterations,tolerance))return false;evaluate();return true;}
     bool clear_ik_target(const std::string&tip){if(!motion_.clear_target(data_.rig,tip))return false;evaluate();return true;}
     bool bone_tip(const std::string&name,std::array<float,2>&out)const{auto i=std::find(data_.rig.names.begin(),data_.rig.names.end(),name);if(i==data_.rig.names.end())return false;out=motion_.tip(data_.rig,int(i-data_.rig.names.begin()));return true;}
@@ -92,12 +131,15 @@ public:
     bool set_slot_visible(const std::string &name,bool show){int s=slot_index(name);if(s<0)return false;hidden_[s]=!show;evaluate();return true;}
     bool set_attachment(const std::string &slot,const std::string &key,bool restore=false){int s=slot_index(slot);if(s<0)return false;if(!restore&&!key.empty()){bool found=false;for(const auto &skin:data_.skins)for(const auto &b:skin.bindings)found|=b.slot==s&&b.key==key;if(!found)return false;}overrides_[s]=key;overridden_[s]=!restore;evaluate();return true;}
     void evaluate(){
-        const Frame *a=&data_.rest,*b=a;float alpha=0;
-        if(clip_>=0){const auto &frames=data_.clips[clip_].frames;auto it=std::upper_bound(frames.begin(),frames.end(),time,[](float t,const Frame&f){return t<f.time;});size_t index=it==frames.begin()?0:size_t(it-frames.begin()-1);a=&frames[index];b=&frames[std::min(index+1,frames.size()-1)];alpha=b->time>a->time?(time-a->time)/(b->time-a->time):0;}
-        for(size_t i=0;i<positions.size();++i)positions[i]=a->positions[i]+(b->positions[i]-a->positions[i])*alpha;
-        motion_.apply(data_.rig,a->matrices,b->matrices,a->influence_positions,b->influence_positions,alpha,positions);
-        for(size_t i=0;i<data_.attachments.size();++i){const auto &m=data_.attachments[i];int s=m.slot;visible[i]=s<0;orders[i]=s<0?int(i):a->orders[s];for(int k=0;k<4;++k)colors[i*4+k]=m.color[k]*(s<0?1:a->colors[s*4+k]+(b->colors[s*4+k]-a->colors[s*4+k])*alpha);}
-        for(size_t s=0;s<data_.slots.size();++s){if(hidden_[s])continue;const auto &key=overridden_[s]?overrides_[s]:a->keys[s];if(key.empty())continue;int index=resolve("default",int(s),key,-1);for(const auto &skin:active_)index=resolve(skin,int(s),key,index);if(index>=0)visible[index]=true;}
+        sample_pose(clip_,time,pose_);
+        if(is_blending()){
+            if(source_clip_>=0)sample_pose(source_clip_,source_time_,source_pose_);
+            float weight=blend_progress();blend_pose(source_pose_,pose_,weight,weight>=.5f,pose_);
+        }
+        positions=pose_.positions;
+        motion_.apply(data_.rig,pose_.matrices,pose_.matrices,pose_.influence_positions,pose_.influence_positions,0,positions);
+        for(size_t i=0;i<data_.attachments.size();++i){const auto &m=data_.attachments[i];int s=m.slot;visible[i]=s<0;orders[i]=s<0?int(i):pose_.orders[s];for(int k=0;k<4;++k)colors[i*4+k]=m.color[k]*(s<0?1:pose_.colors[s*4+k]);}
+        for(size_t s=0;s<data_.slots.size();++s){if(hidden_[s])continue;const auto &key=overridden_[s]?overrides_[s]:pose_.keys[s];if(key.empty())continue;int index=resolve("default",int(s),key,-1);for(const auto &skin:active_)index=resolve(skin,int(s),key,index);if(index>=0)visible[index]=true;}
     }
 };
 }

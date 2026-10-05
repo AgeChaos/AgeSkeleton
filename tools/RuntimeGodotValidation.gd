@@ -26,6 +26,10 @@ func run():
 	ok = player.restore_attachment("Torso") and ok
 	ok = not player.load_file("res://missing.json") and ok
 	ok = abs(player.get_playback_time()-0.35)<0.001 and ok
+	player.set_process(false)
+	ok = player.play("Idle") and player.seek(0.2) and player.cross_fade("Walk",0.4) and player.advance(0.2) and ok
+	ok = player.is_blending() and abs(player.get_blend_progress()-0.5)<0.001 and ok
+	player.pause()
 	var tip = player.get_bone_tip("Left Forearm")
 	ok = tip is Vector2 and ok
 	ok = player.set_ik_target("Left Forearm", tip + Vector2(10, -10), 2, 1.0, 64, 0.01) and ok
@@ -44,10 +48,11 @@ func run():
 	ok = distinct>500 and ok
 	image.save_png("res://runtime-preview.png")
 	player.resume()
-	await create_timer(0.1).timeout
-	ok = player.get_playback_time()>0.35 and ok
+	ok = player.advance(0.1) and player.get_playback_time()>0.2 and ok
 	player.stop()
 	ok = not player.is_playing() and player.get_playback_time()==0 and ok
+	# Drain already queued events from the previous player session.
+	await process_frame
 	# Deterministic native IK and deferred event signal verification.
 	player.set_process(false)
 	ok = player.load_file("res://Assets/MotionFixture/skeleton.ageskel.json") and ok
@@ -66,5 +71,18 @@ func run():
 	ok = player.get_bone_tip("Tip").distance_to(Vector2.ONE) < 0.001 and ok
 	ok = player.clear_ik_target("Tip") and player.get_bone_tip("Tip") == Vector2(2, 0) and ok
 	print("AGESKELETON_MOTION_GODOT_", "PASS" if ok else "FAIL")
+	ok = player.load_file("res://Assets/BlendFixture/skeleton.ageskel.json") and ok
+	ok = player.play("Source") and player.advance(0.25) and player.cross_fade("Destination",1.0) and ok
+	ok = player.is_blending() and player.get_blend_progress()==0 and ok
+	ok = player.get_bone_tip("Tip").distance_to(Vector2(2.5,0))<0.001 and ok
+	ok = player.advance(0.25) and player.get_bone_tip("Tip").distance_to(Vector2(5.25,0))<0.001 and ok
+	ok = player.cross_fade("Third",1.0) and player.get_bone_tip("Tip").distance_to(Vector2(5.25,0))<0.001 and ok
+	ok = player.advance(0.5) and player.get_bone_tip("Tip").distance_to(Vector2(13.625,0))<0.001 and ok
+	player.pause()
+	ok = player.advance(1.0) and abs(player.get_blend_progress()-0.5)<0.001 and ok
+	player.resume()
+	ok = player.advance(0.5) and not player.is_blending() and ok
+	ok = player.get_bone_tip("Tip").distance_to(Vector2(22,0))<0.001 and ok
+	print("AGESKELETON_BLEND_GODOT_", "PASS" if ok else "FAIL")
 	print("AGESKELETON_GODOT_NATIVE_", "PASS" if ok else "FAIL", " pixels=",distinct)
 	quit(0 if ok else 1)

@@ -22476,8 +22476,218 @@ msgstr "Cocos Creator 3.8：使用 TypeScript 组件，绑定图集纹理或原�
 msgid "Godot 4.4+: use the C++ GDExtension and imported atlas textures."
 msgstr "Godot 4.4+：使用 C++ GDExtension 与导入的图集纹理。"
 
-msgid "Exports all clips and skins with PNG atlases, runtime IK targets and animation events. Animation crossfades are not included. Choose a new folder."
-msgstr "导出全部动画、皮肤及 PNG 图集，支持运行时 IK 目标与动画事件。暂不支持动画混合过渡。请选择新目录。"
+msgid "Exports all clips and skins with PNG atlases, animation crossfades, runtime IK targets and animation events. Choose a new folder."
+msgstr "导出全部动画、皮肤及 PNG 图集，支持动画混合过渡、运行时 IK 目标与动画事件。请选择新目录。"
 
 msgid "Native support"
 msgstr "原生支持"
+
+msgid "Open Project Folder"
+msgstr "打开项目目录"
+
+msgid "Could not open the project folder."
+msgstr "无法打开项目目录。"
+
+msgid "AgeSkeleton Project"
+msgstr "AgeSkeleton 工程"
+
+msgid "Legacy skeleton project"
+msgstr "旧版骨骼工程"
+
+msgid "Project saved."
+msgstr "工程已保存。"
+
+msgid "Could not save project."
+msgstr "无法保存工程。"
+
+msgid "Could not open project."
+msgstr "无法打开工程。"
+
+msgid "Save the project first to open its folder."
+msgstr "请先保存工程，再打开其所在目录。"
+
+msgid "Project nesting limit exceeded."
+msgstr "工程数据嵌套层级超出限制。"
+
+msgid "Invalid image path: "
+msgstr "图片路径无效："
+
+msgid "Missing or invalid image: "
+msgstr "图片缺失或无效："
+
+msgid "Cannot read image: "
+msgstr "无法读取图片："
+
+msgid "Cannot decompress image: "
+msgstr "无法解压图片："
+
+msgid "Cannot encode image: "
+msgstr "无法编码图片："
+
+msgid "Cannot write image: "
+msgstr "无法写入图片："
+
+msgid "Cannot copy project resource."
+msgstr "无法复制工程资源。"
+
+msgid "Expected an .ageskeleton project."
+msgstr "请使用 .ageskeleton 工程文件。"
+
+msgid "Cannot create images directory."
+msgstr "无法创建 images 目录。"
+
+msgid "Could not save project; the previous project file was kept."
+msgstr "保存失败，原工程文件已保留。"
+
+msgid "Invalid or unsupported AgeSkeleton project."
+msgstr "AgeSkeleton 工程无效或版本不受支持。"
+
+msgid "Invalid skeletal project data."
+msgstr "骨骼工程数据无效。"
+
+msgid "Adjust mesh"
+msgstr "调整网格"
+
+msgid "Deform mesh"
+msgstr "变形网格"
+
+msgid "Adjust mesh updates texture coordinates and weights. Moving the outline changes the crop. Deform mesh keeps texture coordinates fixed and stretches the image."
+msgstr "调整网格会同步纹理坐标和蒙皮权重，移动外轮廓会改变裁剪范围。变形网格保持纹理坐标不变，会拉伸图片。"
+
+msgid "Drag vertices to adjust the mesh. Double-click a triangle to add a vertex; right-click a vertex to delete it. Esc cancels the drag."
+msgstr "拖动顶点调整网格；双击三角形加点，右键顶点删除，Esc 取消拖动。"
+
+msgid "Select a bone or image. Middle mouse pans; the wheel zooms; Esc cancels the current drag."
+msgstr "选择骨骼或图片；中键平移，滚轮缩放，Esc 取消当前拖动。"
+
+msgid "Auto Contour"
+msgstr "自动轮廓"
+
+msgid "Trace the image's visible edge inside this attachment. Existing internal mesh divisions are retained and weights are interpolated. The result can be undone."
+msgstr "按当前附件内图片的可见边缘生成轮廓，保留内部网格分区并插值蒙皮权重。结果可以撤销。"
+
+msgid "Alpha threshold"
+msgstr "透明度阈值"
+
+msgid "Simplification (pixels)"
+msgstr "轮廓简化（像素）"
+
+msgid "Edge padding (pixels)"
+msgstr "边缘留白（像素）"
+
+msgid "Smaller values follow the edge more closely and create more vertices."
+msgstr "数值越小，轮廓越贴近图片，生成的顶点也越多。"
+
+msgid "Invalid contour settings."
+msgstr "轮廓参数无效。"
+
+msgid "Select an attachment with a readable image."
+msgstr "请选择带有可读取图片的附件。"
+
+msgid "Automatic contour supports images up to 16 million pixels."
+msgstr "自动轮廓支持最多 1600 万像素的图片。"
+
+msgid "Could not decompress the attachment image."
+msgstr "无法解压附件图片。"
+
+msgid "The attachment needs a valid mesh and texture coordinates."
+msgstr "附件需要有效网格和纹理坐标。"
+
+msgid "The attachment mesh cannot be triangulated."
+msgstr "无法对附件网格进行三角剖分。"
+
+msgid "The attachment has invalid triangle indices."
+msgstr "附件的三角形索引无效。"
+
+msgid "No visible pixels at this alpha threshold."
+msgstr "当前透明度阈值下没有可见像素。"
+
+msgid "The contour is too complex. Increase the simplification distance."
+msgstr "轮廓过于复杂，请增大轮廓简化数值。"
+
+msgid "The attachment has invalid skin weights."
+msgstr "附件的蒙皮权重无效。"
+
+msgid "No visible contour intersects this attachment's texture region."
+msgstr "当前附件的纹理区域内没有可见轮廓。"
+
+msgid "Select an image attachment in setup mode."
+msgstr "请在骨架模式下选择图片附件。"
+
+msgid "The generated mesh is invalid. The attachment was not changed."
+msgstr "生成的网格无效，附件未修改。"
+
+msgid "Generate automatic contour"
+msgstr "生成自动轮廓"
+
+msgid "Contour generated: %d vertices. Undo restores the previous mesh."
+msgstr "轮廓已生成：%d 个顶点。撤销可恢复原网格。"
+
+msgid "The project changed. Select the attachment again."
+msgstr "工程已切换，请重新选择附件。"
+
+msgid "This attachment uses frame animation that replaces its mesh. Automatic contour is unavailable."
+msgstr "此附件的逐帧动画会替换网格，暂不能生成自动轮廓。"
+
+msgid "Trace the image's visible edge with fewer vertices and spaced interior control points. Skin weights are interpolated. The result can be undone."
+msgstr "沿图片可见边缘生成较疏的轮廓，保留间隔适当的内部控制点并插值蒙皮权重。结果可以撤销。"
+
+msgid "Skin name"
+msgstr "皮肤名称"
+
+msgid "Skinning"
+msgstr "蒙皮"
+
+msgid "Skins"
+msgstr "皮肤"
+
+msgid "Skin Binding"
+msgstr "皮肤绑定"
+
+msgid "Skin Placeholder"
+msgstr "皮肤占位符"
+
+msgid "IK Constraints"
+msgstr "IK 约束"
+
+msgid "Skeleton Setup"
+msgstr "骨架设置"
+
+msgid "Delete slot"
+msgstr "删除插槽"
+
+msgid "Slot"
+msgstr "插槽"
+
+msgid "Slots"
+msgstr "插槽"
+
+msgid "Bone"
+msgstr "骨骼"
+
+msgid "Skeleton"
+msgstr "骨架"
+
+msgid "Image"
+msgstr "图片"
+
+msgid "Skin"
+msgstr "皮肤"
+
+msgid "Apply skin"
+msgstr "应用皮肤"
+
+msgid "Draw Order"
+msgstr "绘制顺序"
+
+msgid "Blend Mode"
+msgstr "混合模式"
+
+msgid "Attachment"
+msgstr "附件"
+
+msgid "Color"
+msgstr "颜色"
+
+msgid "Drag left or right to adjust. Shift: fine adjustment. Click to type. Esc: cancel drag."
+msgstr "按住左右拖动调值；Shift 微调；轻点输入数字；Esc 取消拖动。"

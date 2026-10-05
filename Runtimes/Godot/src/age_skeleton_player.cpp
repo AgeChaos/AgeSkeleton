@@ -41,6 +41,9 @@ protected:
         ADD_PROPERTY(PropertyInfo(Variant::STRING,"source",PROPERTY_HINT_FILE,"*.json"),"set_source","get_source");
         ClassDB::bind_method(D_METHOD("get_batch_count"),&AgeSkeletonPlayer::get_batch_count);
         ClassDB::bind_method(D_METHOD("load_file","path"),&AgeSkeletonPlayer::load_file);
+        ClassDB::bind_method(D_METHOD("cross_fade","animation","duration","restart"),&AgeSkeletonPlayer::cross_fade,DEFVAL(0.2),DEFVAL(true));
+        ClassDB::bind_method(D_METHOD("is_blending"),&AgeSkeletonPlayer::is_blending);
+        ClassDB::bind_method(D_METHOD("get_blend_progress"),&AgeSkeletonPlayer::get_blend_progress);
         ClassDB::bind_method(D_METHOD("play","animation"),&AgeSkeletonPlayer::play);ClassDB::bind_method(D_METHOD("pause"),&AgeSkeletonPlayer::pause);ClassDB::bind_method(D_METHOD("resume"),&AgeSkeletonPlayer::resume);
         ClassDB::bind_method(D_METHOD("stop"),&AgeSkeletonPlayer::stop);ClassDB::bind_method(D_METHOD("seek","time"),&AgeSkeletonPlayer::seek);
         ClassDB::bind_method(D_METHOD("set_skin","name"),&AgeSkeletonPlayer::set_skin);ClassDB::bind_method(D_METHOD("set_wardrobe","group","skin"),&AgeSkeletonPlayer::set_wardrobe);
@@ -74,6 +77,9 @@ public:
         redraw();return true;
     }
     int get_batch_count()const{return int(batcher.batches.size());}
+    bool cross_fade(const String &name,double duration=.2,bool restart=true){bool ok=player.cross_fade(utf8(name),duration,restart);if(ok)redraw();return ok;}
+    bool is_blending()const{return player.is_blending();}
+    double get_blend_progress()const{return player.blend_progress();}
     bool play(const String &name){bool ok=player.play(utf8(name));if(ok)redraw();return ok;}
     void pause(){player.playing=false;}void resume(){player.playing=true;}void stop(){player.stop();redraw();}
     bool seek(double time){bool ok=player.seek(float(time));if(ok)redraw();return ok;}

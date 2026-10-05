@@ -11,6 +11,7 @@ public static class RuntimeUnityValidation {
     public static void Run(){
         try{
             RuntimeMotionValidation.Validate();
+            RuntimeBlendValidation.Validate();
             var json=AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Wayfarer/skeleton.ageskel.json");Check(json,"fixture import");
             var d=JsonUtility.FromJson<MeshClip>(json.text);var p=new Player(d);p.Play("Walk");p.Seek(.35f);float x=p.Positions[0];
             p.SetWardrobe("Tops","Tops/Steel Armor");Check(p.Playing&&p.Positions[0]==x,"outfit preserves animation");

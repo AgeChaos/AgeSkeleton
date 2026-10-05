@@ -143,36 +143,47 @@ bool ECSAnimationEditor::run_slot_hierarchy_self_test() {
 
 void ECSAnimationEditor::build_slot_tools(BoxContainer *parent) {
 	auto row=[&]() { auto *line=memnew(HBoxContainer); parent->add_child(line); return line; };
+    auto caption=[&](BoxContainer *line,const String &value) { auto *label=memnew(Label);label->set_text(value);label->set_custom_minimum_size(Size2(75,0)*EDSCALE);line->add_child(label); };
 	auto choice=[&](BoxContainer *line,int action) { auto *option=memnew(OptionButton); option->set_h_size_flags(SIZE_EXPAND_FILL); line->add_child(option); option->connect("item_selected",callable_mp(this,&ECSAnimationEditor::slot_action).bind(action).unbind(1)); return option; };
 	auto text=[&](BoxContainer *line,const String &placeholder) { auto *edit=memnew(LineEdit); edit->set_placeholder(placeholder); edit->set_h_size_flags(SIZE_EXPAND_FILL); line->add_child(edit); return edit; };
 	auto button=[&](BoxContainer *line,const String &label,int action) { auto *control=memnew(Button);control->set_text(label);line->add_child(control);control->connect("pressed",callable_mp(this,&ECSAnimationEditor::slot_action).bind(action)); };
-	skin_choice=choice(row(),0);
-    auto *create_row=row(); button(create_row,String(U"新建皮肤"),12); button(create_row,String(U"重命名"),13);
+	auto show=[&](Control *control,int contexts,bool setup=false,bool animation=false) { contextual_control(control,contexts,setup,animation); };
+	const int skins=INSPECT_RIG|INSPECT_SKIN|INSPECT_SKINS;
+	skin_choice=choice(row(),0); show(Object::cast_to<Control>(skin_choice->get_parent()),INSPECT_RIG|INSPECT_SKINS|INSPECT_PLACEHOLDER);
+    auto *create_row=row(); skin_name_edit=text(create_row,TTR("Skin name")); show(create_row,skins,true);
+    auto *skin_buttons=row(); button(skin_buttons,String(U"新建皮肤"),12); button(skin_buttons,String(U"重命名"),13); button(skin_buttons,String(U"复制皮肤"),1); button(skin_buttons,String(U"删除"),2); show(skin_buttons,skins,true);
+    auto *apply_row=row();button(apply_row,TTR("Apply skin"),0);show(apply_row,INSPECT_SKIN);
     skin_layers=memnew(ItemList); skin_layers->set_select_mode(ItemList::SELECT_MULTI); skin_layers->set_custom_minimum_size(Size2(0,90)*EDSCALE); skin_layers->set_tooltip_text(String(U"Ctrl 多选需要组合的皮肤；下面的同名附件覆盖上面的。")); parent->add_child(skin_layers);
-    auto *layer_row=row(); button(layer_row,String(U"应用组合"),14); button(layer_row,String(U"上移"),15); button(layer_row,String(U"下移"),16);
-	auto *line=row();skin_name_edit=text(line,String(U"新皮肤名称"));button(line,String(U"复制皮肤"),1);button(line,String(U"删除"),2);
-	slot_choice=choice(row(),3);
-	line=row();slot_name_edit=text(line,String(U"新插槽名称"));button(line,String(U"添加插槽"),4);button(line,String(U"删除"),5);
-	attachment_choice=choice(row(),6);
-	line=row();attachment_name_edit=text(line,String(U"皮肤占位符名称"));button(line,String(U"创建占位符"),17);
-    skin_attachment_target=memnew(OptionButton); parent->add_child(skin_attachment_target);
-    line=row();button(line,String(U"绑定图片到当前皮肤"),7);button(line,String(U"解除当前绑定"),19);
-    line=row();button(line,String(U"重命名占位符"),20);button(line,String(U"删除占位符"),18);
-	line=row();slot_tint=memnew(ColorPickerButton);slot_tint->set_h_size_flags(SIZE_EXPAND_FILL);slot_tint->set_tooltip_text(String(U"插槽颜色"));line->add_child(slot_tint);slot_tint->connect("color_changed",callable_mp(this,&ECSAnimationEditor::slot_action).bind(8).unbind(1));
+    show(skin_layers,skins);
+    auto *layer_row=row(); button(layer_row,String(U"应用组合"),14); button(layer_row,String(U"上移"),15); button(layer_row,String(U"下移"),16); show(layer_row,skins);
+	slot_choice=choice(row(),3); show(Object::cast_to<Control>(slot_choice->get_parent()),INSPECT_SKIN);
+	auto *line=row();slot_name_edit=text(line,String(U"新插槽名称"));button(line,String(U"添加插槽"),4);show(line,INSPECT_RIG|INSPECT_BONE,true);
+    line=row();caption(line,TTR("Attachment")); attachment_choice=choice(line,6); show(line,INSPECT_SLOT|INSPECT_SKIN);
+	line=row();attachment_name_edit=text(line,String(U"皮肤占位符名称"));button(line,String(U"创建占位符"),17); show(line,INSPECT_SLOT|INSPECT_SKIN|INSPECT_PLACEHOLDER,true); show(Object::cast_to<Control>(line->get_child(1)),INSPECT_SLOT|INSPECT_SKIN,true);
+    line=row();caption(line,TTR("Image"));skin_attachment_target=memnew(OptionButton);skin_attachment_target->set_h_size_flags(SIZE_EXPAND_FILL);line->add_child(skin_attachment_target);
+    show(line,INSPECT_SKIN|INSPECT_PLACEHOLDER,true);
+    line=row();button(line,String(U"绑定图片到当前皮肤"),7);button(line,String(U"解除当前绑定"),19); show(line,INSPECT_SKIN|INSPECT_PLACEHOLDER,true);
+    line=row();button(line,String(U"重命名占位符"),20);button(line,String(U"删除占位符"),18); show(line,INSPECT_PLACEHOLDER,true);
+    line=row();caption(line,TTR("Color"));slot_tint=memnew(ColorPickerButton);slot_tint->set_h_size_flags(SIZE_EXPAND_FILL);slot_tint->set_tooltip_text(String(U"插槽颜色"));line->add_child(slot_tint);slot_tint->connect("color_changed",callable_mp(this,&ECSAnimationEditor::slot_action).bind(8).unbind(1));show(line,INSPECT_SLOT);
+    line=row();caption(line,TTR("Draw Order"));
 	slot_order=memnew(SpinBox);slot_order->set_min(-4096);slot_order->set_max(4096);slot_order->set_step(1);slot_order->set_tooltip_text(String(U"绘制顺序"));line->add_child(slot_order);slot_order->connect("value_changed",callable_mp(this,&ECSAnimationEditor::slot_action).bind(8).unbind(1));
-	line=row(); button(line,String(U"附件关键帧"),9); button(line,String(U"颜色关键帧"),10); button(line,String(U"顺序关键帧"),11);
-	slot_blend=choice(row(),8);slot_blend->add_item(String(U"正常混合"));slot_blend->add_item(String(U"加法混合"));slot_blend->add_item(String(U"正片叠底"));
+    show(line,INSPECT_SLOT);
+	line=row(); button(line,String(U"附件关键帧"),9); button(line,String(U"颜色关键帧"),10); button(line,String(U"顺序关键帧"),11); show(line,INSPECT_SLOT,false,true);
+    line=row();caption(line,TTR("Blend Mode"));slot_blend=choice(line,8);slot_blend->add_item(String(U"正常混合"));slot_blend->add_item(String(U"加法混合"));slot_blend->add_item(String(U"正片叠底"));
+    show(Object::cast_to<Control>(slot_blend->get_parent()),INSPECT_SLOT);
+    line=row();button(line,TTR("Delete slot"),5);show(line,INSPECT_SLOT,true);
 }
 
 void ECSAnimationEditor::refresh_slot_tools() {
 	if(!skin_choice || scene.is_null() || refreshing_slots) { return; }
 	refreshing_slots=true;
 	String selected_slot=slot_choice->get_selected()<0?String():slot_choice->get_item_text(slot_choice->get_selected());
+    if(inspector_selection.has("slot")) { selected_slot=inspector_selection["slot"]; }
 	skin_choice->clear();slot_choice->clear();attachment_choice->clear(); skin_layers->clear(); skin_attachment_target->clear();
 	int rig=find_rig(target->get_selected_id());
 	Dictionary definition=rig<0?Dictionary():Dictionary(Dictionary(scene->get_entities()[rig]).get("skeleton_2d",Dictionary()));
 	refresh_wardrobe_tools(rig,definition);
-	Dictionary skins=definition.get("skins",Dictionary());String active=definition.get("skin",String("default"));
+	Dictionary skins=definition.get("skins",Dictionary());String active=inspector_selection.get("skin",definition.get("skin",String("default")));
 	PackedStringArray stack=definition.get("active_skins",PackedStringArray());
     PackedStringArray layer_names=stack; for(const Variant &name:skins.keys()) { if(!layer_names.has(name)) { layer_names.push_back(name); } }
     for(const String &name:layer_names) { skin_layers->add_item(name,skeleton_workspace_icon("skin")); if(stack.has(name)) { skin_layers->select(skin_layers->get_item_count()-1,false); } }
@@ -192,7 +203,14 @@ void ECSAnimationEditor::refresh_slot_tools() {
 		slot_tint->set_pick_color(slot.get("color",Color(1,1,1)));slot_order->set_value_no_signal(slot.get("z_index",selected));slot_blend->select(slot.get("blend",0));
 	}
 	slot_tint->set_disabled(selected<0);slot_order->set_editable(selected>=0);slot_blend->set_disabled(selected<0);
+    if(inspector_selection.has("placeholder")) {
+        String name=inspector_selection["placeholder"]; attachment_name_edit->set_text(name);
+        for(int i=0;i<attachment_choice->get_item_count();i++) { if(String(attachment_choice->get_item_metadata(i))==name) { attachment_choice->select(i); break; } }
+        Dictionary named=Dictionary(skins.get(active,Dictionary())).get(selected_slot,Dictionary()); int image=named.get(name,-1);
+        skin_attachment_target->select(skin_attachment_target->get_item_index(image));
+    }
 	refreshing_slots=false;
+    refresh_inspector_context();
 }
 
 void ECSAnimationEditor::refresh_wardrobe_tools(int rig, const Dictionary &definition) {
@@ -204,7 +222,7 @@ void ECSAnimationEditor::refresh_wardrobe_tools(int rig, const Dictionary &defin
 		String name=key; int slash=name.find("/"); if(slash<=0 || slash==name.length()-1) { continue; }
 		String group=name.substr(0,slash); PackedStringArray names=groups.get(group,PackedStringArray()); names.push_back(name); groups[group]=names;
 	}
-	Object::cast_to<Control>(wardrobe_tools->get_parent())->set_visible(!groups.is_empty());
+	Object::cast_to<Control>(wardrobe_tools->get_parent())->set_visible(!groups.is_empty() && (inspector_context()&(INSPECT_RIG|INSPECT_SKIN|INSPECT_SKINS)));
 	PackedStringArray active=definition.get("active_skins",PackedStringArray());
 	if(active.is_empty()) { active.push_back(definition.get("skin",String("default"))); }
 	for(const Variant &key:groups.keys()) {
@@ -257,7 +275,7 @@ void ECSAnimationEditor::slot_action(int action) {
 	if(animation_mode && (action==6 || action==8)) { return; }
 	int selected=target->get_selected_id(),rig=find_rig(selected);if(rig<0) { return; }
 	Array entities=scene->get_entities().duplicate(true);Dictionary root=entities[rig],definition=root["skeleton_2d"];
-	Dictionary skins=definition.get("skins",Dictionary());Array slots=definition.get("slots",Array());String active=definition.get("skin",String("default"));
+	Dictionary skins=definition.get("skins",Dictionary());Array slots=definition.get("slots",Array());String active=inspector_selection.get("skin",definition.get("skin",String("default")));
 	if(skins.is_empty()) { skins["default"]=Dictionary();active="default"; }
 	PackedInt64Array library=definition.get("attachment_library",PackedInt64Array());
 	for(const Variant &skin_name:skins.keys()) { Dictionary skin=skins[skin_name];for(const Variant &slot_name:skin.keys()) { Dictionary named=skin[slot_name];for(const Variant &name:named.keys()) { int64_t id=named[name];if(!library.has(id)) { library.push_back(id); } } } }
@@ -298,6 +316,13 @@ void ECSAnimationEditor::slot_action(int action) {
 		else if(action==8) { slot["color"]=slot_tint->get_pick_color();slot["z_index"]=int(slot_order->get_value());slot["blend"]=slot_blend->get_selected(); }
 	}
 	definition["attachment_library"]=library;definition["slots"]=slots;definition["skins"]=skins;definition["skin"]=active;
-	stop_preview();commit_entities(entities,String(U"编辑皮肤与插槽"));select_target(selected);refresh_slot_tools();
+    Dictionary context=inspector_selection.duplicate();
+    if(context.has("skin") && (action==0 || action==1 || action==2 || action==12 || action==13)) { context["skin"]=active; }
+    if(action==20 && context.has("placeholder")) { context["placeholder"]=attachment_name_edit->get_text().strip_edges(); }
+    if(action==18) { context.erase("placeholder"); }
+    if(action==5) { context.clear(); }
+	stop_preview(); inspector_selection=context; commit_entities(entities,String(U"编辑皮肤与插槽"));
+    if(context.is_empty()) { select_target(selected); } else { inspector_selection=context; refresh_selection_properties(); }
+    refresh_slot_tools();
 }
 #endif

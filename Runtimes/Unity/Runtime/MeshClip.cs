@@ -82,20 +82,45 @@ namespace AgeSkeleton
         readonly string[] slotOverrides;
         readonly bool[] hidden;
         Clip clip;readonly MotionPose motion;bool eventStart;
+        Frame pose,sourcePose;Clip sourceClip;float sourceTime;double fadeDuration,fadeElapsed;
+        public bool IsBlending => fadeDuration>0;
+        public float BlendProgress => IsBlending?(float)(fadeElapsed/fadeDuration):1;
+        void CancelFade(){fadeDuration=fadeElapsed=0;sourceClip=null;}
+        static Frame Buffer(Frame f)=>new Frame{positions=new float[f.positions.Length],colors=new float[f.colors.Length],keys=new string[f.keys.Length],orders=new int[f.orders.Length],matrices=new float[f.matrices?.Length??0],influencePositions=new float[f.influencePositions?.Length??0]};
+        static void BlendNumbers(float[] a,float[] b,float t,float[] output){for(int i=0;i<output.Length;i++)output[i]=t<=0?a[i]:t>=1?b[i]:a[i]+(b[i]-a[i])*t;}
+        static void BlendPose(Frame a,Frame b,float t,bool targetKeys,Frame output){
+            BlendNumbers(a.positions,b.positions,t,output.positions);BlendNumbers(a.colors,b.colors,t,output.colors);
+            BlendNumbers(a.matrices,b.matrices,t,output.matrices);BlendNumbers(a.influencePositions,b.influencePositions,t,output.influencePositions);
+            Array.Copy(targetKeys?b.keys:a.keys,output.keys,output.keys.Length);Array.Copy(targetKeys?b.orders:a.orders,output.orders,output.orders.Length);
+        }
+        static float ClipTime(Clip c,double at)=>(float)(c.loop?(at%c.duration+c.duration)%c.duration:Math.Max(0,Math.Min(c.duration,at)));
+        void SamplePose(Clip selected,float at,Frame output){
+            Frame a=Data.rest,b=a;float t=0;
+            if(selected!=null){int lo=0,hi=selected.frames.Length-1;while(lo<hi){int mid=(lo+hi+1)/2;if(selected.frames[mid].time<=at)lo=mid;else hi=mid-1;}a=selected.frames[lo];b=selected.frames[Math.Min(lo+1,selected.frames.Length-1)];t=b.time>a.time?(at-a.time)/(b.time-a.time):0;}
+            BlendPose(a,b,t,false,output);
+        }
         public readonly List<AnimationEvent> Events=new List<AnimationEvent>();
         public Player(MeshClip data)
         {
             data.Validate(); Data = data; Positions = new float[data.vertexCount * 2]; Colors = new float[data.attachments.Length * 4];
             Visible = new bool[data.attachments.Length]; Orders = new int[data.attachments.Length]; slotOverrides = new string[data.slots.Length]; hidden = new bool[data.slots.Length];
-            active.AddRange(data.defaultSkins);motion=new MotionPose(data.version==2?data.rig:null); Evaluate();
+            active.AddRange(data.defaultSkins);pose=Buffer(data.rest);sourcePose=Buffer(data.rest);motion=new MotionPose(data.version==2?data.rig:null); Evaluate();
         }
         public void Play(string name, bool restart = true)
         {
             Clip next = Array.Find(Data.clips, x => x.name == name) ?? throw new ArgumentException("Unknown animation: " + name);
-            if (restart || clip != next) {Time = 0;eventStart=true;} Events.Clear(); clip = next; Playing = true; Evaluate();
+            CancelFade();if (restart || clip != next) {Time = 0;eventStart=true;} Events.Clear(); clip = next; Playing = true; Evaluate();
         }
-        public void Stop() { Events.Clear();eventStart=false;clip = null; Time = 0; Playing = false; Evaluate(); }
-        public void Seek(float time) { if (float.IsNaN(time) || float.IsInfinity(time)) throw new ArgumentException("Invalid time");Events.Clear();eventStart=false; Time = clip == null ? 0 : Math.Max(0, Math.Min(clip.duration, time)); Evaluate(); }
+        public void CrossFade(string name,float duration=.2f,bool restart=true){
+            if(float.IsNaN(duration)||float.IsInfinity(duration)||duration<0)throw new ArgumentException("Invalid blend duration");
+            Clip next=Array.Find(Data.clips,x=>x.name==name)??throw new ArgumentException("Unknown animation: "+name);
+            if(duration==0){Play(name,restart);return;}
+            Evaluate();BlendPose(pose,pose,0,false,sourcePose);sourceClip=!IsBlending&&Playing?clip:null;sourceTime=Time;
+            if(restart||next!=clip){Time=0;eventStart=true;}
+            clip=next;fadeDuration=duration;fadeElapsed=0;Events.Clear();Playing=true;Evaluate();
+        }
+        public void Stop() { CancelFade();Events.Clear();eventStart=false;clip = null; Time = 0; Playing = false; Evaluate(); }
+        public void Seek(float time) { if (float.IsNaN(time) || float.IsInfinity(time)) throw new ArgumentException("Invalid time");CancelFade();Events.Clear();eventStart=false; Time = clip == null ? 0 : Math.Max(0, Math.Min(clip.duration, time)); Evaluate(); }
         public void Update(float delta)
         {
             Events.Clear();if (!Playing || clip == null) return;
@@ -103,8 +128,13 @@ namespace AgeSkeleton
             double next = Time + (double)delta * Speed;
             if(double.IsInfinity(next)||double.IsNaN(next))throw new ArgumentException("Playback overflow");
             double to=clip.loop?next:Math.Max(0,Math.Min(clip.duration,next));if(Data.version==2)EventTraversal.Collect(clip,Time,to,eventStart,Events);if(to!=Time)eventStart=false;
-            if (clip.loop) Time = (float)((next % clip.duration + clip.duration) % clip.duration);
-            else { Time = (float)Math.Max(0, Math.Min(clip.duration, next)); if (next >= clip.duration || next < 0) Playing = false; }
+            double step=(double)delta*Speed;
+            if(IsBlending){
+                if(sourceClip!=null)sourceTime=ClipTime(sourceClip,sourceTime+step);
+                fadeElapsed=Math.Min(fadeDuration,fadeElapsed+Math.Abs(step));if(fadeElapsed>=fadeDuration)CancelFade();
+            }
+            Time=ClipTime(clip,next);
+            if(!clip.loop&&!IsBlending&&((Speed>0&&next>=clip.duration)||(Speed<0&&next<=0)))Playing=false;
             Evaluate();
         }
         public void SetIKTarget(string bone,float x,float y,int chainLength=2,float mix=1,int iterations=24,float tolerance=.1f){motion.SetTarget(bone,x,y,chainLength,mix,iterations,tolerance);Evaluate();}
@@ -134,24 +164,17 @@ namespace AgeSkeleton
         }
         void Evaluate()
         {
-            Frame a = Data.rest, b = a; float t = 0;
-            if (clip != null)
-            {
-                int lo = 0, hi = clip.frames.Length - 1;
-                while (lo < hi) { int mid = (lo + hi + 1) / 2; if (clip.frames[mid].time <= Time) lo = mid; else hi = mid - 1; }
-                a = clip.frames[lo]; b = clip.frames[Math.Min(lo + 1, clip.frames.Length - 1)];
-                t = b.time > a.time ? (Time - a.time) / (b.time - a.time) : 0;
-            }
-            for (int i = 0; i < Positions.Length; ++i) Positions[i] = a.positions[i] + (b.positions[i] - a.positions[i]) * t;
-            motion.Apply(a,b,t,Positions);
+            SamplePose(clip,Time,pose);
+            if(IsBlending){if(sourceClip!=null)SamplePose(sourceClip,sourceTime,sourcePose);float weight=BlendProgress;BlendPose(sourcePose,pose,weight,weight>=.5f,pose);}
+            Array.Copy(pose.positions,Positions,Positions.Length);motion.Apply(pose,pose,0,Positions);
             for (int i = 0; i < Data.attachments.Length; ++i)
             {
-                Attachment mesh = Data.attachments[i]; int s = mesh.slot; Visible[i] = s < 0; Orders[i] = s < 0 ? i : a.orders[s];
-                for (int k = 0; k < 4; ++k) Colors[i * 4 + k] = mesh.color[k] * (s < 0 ? 1 : a.colors[s * 4 + k] + (b.colors[s * 4 + k] - a.colors[s * 4 + k]) * t);
+                Attachment mesh = Data.attachments[i]; int s = mesh.slot; Visible[i] = s < 0; Orders[i] = s < 0 ? i : pose.orders[s];
+                for (int k = 0; k < 4; ++k) Colors[i * 4 + k] = mesh.color[k] * (s < 0 ? 1 : pose.colors[s * 4 + k]);
             }
             for (int s = 0; s < Data.slots.Length; ++s)
             {
-                if (hidden[s]) continue; string key = slotOverrides[s] ?? a.keys[s]; if (key.Length == 0) continue;
+                if (hidden[s]) continue; string key = slotOverrides[s] ?? pose.keys[s]; if (key.Length == 0) continue;
                 int index = Resolve("default", s, key, -1); foreach (string skin in active) index = Resolve(skin, s, key, index);
                 if (index >= 0) Visible[index] = true;
             }
