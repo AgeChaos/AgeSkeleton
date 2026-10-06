@@ -22691,3 +22691,6 @@ msgstr "颜色"
 
 msgid "Drag left or right to adjust. Shift: fine adjustment. Click to type. Esc: cancel drag."
 msgstr "按住左右拖动调值；Shift 微调；轻点输入数字；Esc 取消拖动。"
+
+msgid "Event triggered: %s"
+msgstr "事件触发：%s"

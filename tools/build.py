@@ -29,6 +29,7 @@ def main():
         root.mkdir(parents=True, exist_ok=True)
         binary = source / "bin/godot.windows.editor.x86_64.skeleton.exe"
         shutil.copy2(binary, root / "AgeSkeleton.exe")
+        shutil.copy2(source / "platform/windows/godot.ico", root / "AgeSkeleton.ico")
         console = source / "bin/godot.windows.editor.x86_64.skeleton.console.exe"
         if console.exists():
             shutil.copy2(console, root / "AgeSkeleton.console.exe")

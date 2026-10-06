@@ -32,6 +32,65 @@
 #include "editor/themes/editor_scale.h"
 #include "scene/gui/dialogs.h"
 #include "editor/gui/editor_file_dialog.h"
+
+// Preview transport owns its loop range; the resource's loop mode must not
+// deliver events outside that range or wrap a non-looping preview.
+static Array preview_events(const Ref<Animation> &clip, double from, double to, double start, double end, bool loop, bool include_start) {
+	struct Hit { double time; int track; int key; Dictionary event; };
+	Vector<Hit> hits;
+	const double span=end-start;
+	if(clip.is_null() || span<=0 || !Math::is_finite(from) || !Math::is_finite(to)) { return Array(); }
+	if(!loop) { to=CLAMP(to,start,end); }
+	const bool forward=to>=from;
+	const int first=loop?int(Math::floor((MIN(from,to)-end)/span)):0;
+	const int last=loop?MIN(first+1024,int(Math::ceil((MAX(from,to)-start)/span))):0;
+	for(int track=0;track<clip->get_track_count();track++) {
+		NodePath path=clip->track_get_path(track);
+		if(!clip->track_is_enabled(track) || clip->track_get_type(track)!=Animation::TYPE_VALUE || path.get_subname_count()==0 || path.get_subname(0)!=StringName("event")) { continue; }
+		for(int key=0;key<clip->track_get_key_count(track);key++) {
+			double at=clip->track_get_key_time(track,key);
+			Variant value=clip->track_get_key_value(track,key);
+			if(at<start || at>end || value.get_type()!=Variant::DICTIONARY) { continue; }
+			for(int cycle=first;cycle<=last;cycle++) {
+				double occurrence=at+cycle*span;
+				if((forward?occurrence>from && occurrence<=to:occurrence<from && occurrence>=to) || (include_start && occurrence==from && cycle==0)) {
+					Hit hit; hit.time=occurrence; hit.track=track; hit.key=key; hit.event=value; hits.push_back(hit);
+				}
+			}
+		}
+	}
+	struct HitOrder { bool operator()(const Hit &a,const Hit &b) const { return a.time!=b.time?a.time<b.time:(a.track!=b.track?a.track<b.track:a.key<b.key); } };
+	hits.sort_custom<HitOrder>();
+	Array events;
+	for(int i=0;i<hits.size();i++) { events.push_back(hits[forward?i:hits.size()-1-i].event); }
+	return events;
+}
+
+void ECSAnimationEditor::show_preview_events(const Array &events) {
+	if(events.is_empty()) { return; }
+	String names;
+	for(const Variant &value:events) {
+		if(!names.is_empty()) { names+=", "; }
+		names+=String(Dictionary(value).get("name",String()));
+	}
+	String message=TTR("Event triggered: %s").replace("%s",names);
+	feedback->set_text(message);
+	event_toast->set_text(message);
+	event_toast_age=0;
+	event_toast->show();
+	update_event_toast(0);
+}
+
+void ECSAnimationEditor::update_event_toast(double delta) {
+	if(!event_toast || !event_toast->is_visible()) { return; }
+	event_toast_age+=delta;
+	if(event_toast_age>=1.4) { event_toast->hide(); return; }
+	event_toast->set_modulate(Color(1,1,1,1.0-CLAMP((event_toast_age-.65)/.75,0.0,1.0)));
+	float width=MAX(1.0f,local_canvas->get_size().x-32*EDSCALE);
+	event_toast->set_size(Size2(width,0));
+	event_toast->set_position(Vector2(16,64-20*event_toast_age/1.4)*EDSCALE);
+}
+
 class ECSAnimationTimeline : public Control {
 	GDCLASS(ECSAnimationTimeline, Control);
 	ECSAnimationEditor *editor=nullptr;
@@ -585,6 +644,15 @@ ECSAnimationEditor::ECSAnimationEditor() {
 	auto *panels_menu=memnew(MenuButton); panels_menu->set_text(TTR("Panels")); panels_menu->set_name("WorkspacePanels"); bar->add_child(panels_menu);
 	Vector<SplitContainer *> dock_splits; dock_splits.push_back(outer); dock_splits.push_back(left); dock_splits.push_back(sheet_split); dock_splits.push_back(sidebar);
 	build_canvas_tools();
+	event_toast=memnew(Label); event_toast->set_name("AnimationEventToast"); local_canvas->add_child(event_toast);
+	event_toast->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
+	event_toast->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
+	event_toast->set_text_overrun_behavior(TextServer::OVERRUN_TRIM_ELLIPSIS);
+	event_toast->add_theme_font_size_override("font_size",16*EDSCALE);
+	event_toast->add_theme_color_override("font_color",Color(1,.83,.48));
+	event_toast->add_theme_color_override("font_outline_color",Color(.08,.08,.08,.95));
+	event_toast->add_theme_constant_override("outline_size",6*EDSCALE);
+	event_toast->hide();
 	workspace_docking->setup(this,panels_menu,dock_tabs,dock_splits);
 	load_workspace_preferences();
 	set_mode(0);
@@ -597,6 +665,7 @@ Ref<Animation> ECSAnimationEditor::current_clip() const {
 	return named.has(editing_state)?Ref<Animation>(named[editing_state]):Ref<Animation>(data.get("clip",Variant()));
 }
 void ECSAnimationEditor::_notification(int what) {
+	if(what==NOTIFICATION_PROCESS) { update_event_toast(get_process_delta_time()); }
 	if(what==NOTIFICATION_DRAW) { draw_rect(Rect2(Vector2(),get_size()),Color(.18,.18,.18)); }
 	if(what==NOTIFICATION_EXIT_TREE) { cancel_motion_export(); skeleton_ai_stop(); }
 	if(what==NOTIFICATION_READY) { skeleton_ai_start(); get_window()->connect("files_dropped",callable_mp(this,&ECSAnimationEditor::external_images_dropped)); }
@@ -612,8 +681,8 @@ void ECSAnimationEditor::_notification(int what) {
 		Ref<Animation> clip=current_clip(); if(clip.is_null()) { playing=false; return; }
 		double start=loop_start->get_value()/timeline_fps,end=MIN(clip->get_length(),loop_end->get_value()/timeline_fps); if(end<=start) { start=0; end=clip->get_length(); }
 		double next=playback_time+get_process_delta_time()*playback_direction;
-		Array crossed=ECSWorld::sample_animation_events(clip,playback_time,next,false);
-		if(!crossed.is_empty()) { String names; for(const Variant &item:crossed) { if(!names.is_empty()) { names+="、"; } names+=String(Dictionary(item).get("name",String())); } feedback->set_text(String(U"动画事件：")+names); }
+		show_preview_events(preview_events(clip,playback_time,next,start,end,loop_playback->is_pressed(),playback_include_start));
+		playback_include_start=false;
 		if(next>=end || next<start) { if(loop_playback->is_pressed() && end>start) { next=start+Math::fposmod(next-start,end-start); } else { next=CLAMP(next,start,end); playing=false; } }
 		playback_time=next; time->set_value_no_signal(next); frame->set_value_no_signal(Math::round(next*timeline_fps)); canvas->preview_animation(owner->get_selected_id(),next,false,editing_state); timeline->queue_redraw(); refresh_canvas_values();
 	}
@@ -787,6 +856,25 @@ void ECSAnimationEditor::select_target(int index) {
     if(!animation_mode && canvas_tools[1]->is_pressed() && chosen.has("polygon_2d")) { image_action(3); }
 }
 bool ECSAnimationEditor::run_inspector_self_test() {
+    Ref<Animation> events_clip; events_clip.instantiate(); events_clip->set_length(2); events_clip->set_loop_mode(Animation::LOOP_LINEAR);
+    int event_track=events_clip->add_track(Animation::TYPE_VALUE); events_clip->track_set_path(event_track,NodePath(".:event:hit"));
+    for(int i=0;i<4;i++) { Dictionary event; event["name"]="hit_"+itos(i); events_clip->track_insert_key(event_track,i*.5,event); }
+    bool event_ok=preview_events(events_clip,0,.1,0,1,true,true).size()==1;
+    event_ok &= preview_events(events_clip,0,.1,0,1,true,false).is_empty();
+    event_ok &= preview_events(events_clip,.9,1.1,0,1,true,false).size()==2;
+    event_ok &= preview_events(events_clip,.9,1.9,0,1,false,false).size()==1;
+    event_ok &= preview_events(events_clip,.9,1.1,.5,1,true,false).size()==2;
+    event_ok &= preview_events(events_clip,.6,.4,.5,1,true,false).size()==2;
+    events_clip->track_set_enabled(event_track,false);
+    event_ok &= preview_events(events_clip,0,1,0,1,true,true).is_empty();
+    events_clip->track_set_enabled(event_track,true);
+    Array toast_events=preview_events(events_clip,0,.1,0,1,false,true);
+    show_preview_events(toast_events); event_ok &= event_toast->is_visible() && event_toast->get_text().contains("hit_0");
+    double toast_y=event_toast->get_position().y; update_event_toast(1);
+    event_ok &= event_toast->get_position().y<toast_y && event_toast->get_modulate().a<1;
+    show_preview_events(toast_events); event_ok &= event_toast_age==0 && event_toast->get_modulate().a==1;
+    update_event_toast(1.5); event_ok &= !event_toast->is_visible() && event_toast->get_mouse_filter()==Control::MOUSE_FILTER_IGNORE;
+    print_line(event_ok?"SKELETON_EVENT_TOAST_PASS start repeat fade loop_range reverse no_loop disabled":"SKELETON_EVENT_TOAST_FAIL");
     Ref<ECSScene> saved=scene; bool mode=animation_mode; bool standalone=independent_project; independent_project=false;
     Ref<ECSScene> test; test.instantiate(); Array entities;
     Dictionary root,bone,image,definition,slot,skin,named,skins;
@@ -796,7 +884,7 @@ bool ECSAnimationEditor::run_inspector_self_test() {
     definition["bones"]=PackedInt64Array({1}); slot["name"]="Head"; slot["bone"]=0; slot["attachment"]="face"; Array slots; slots.push_back(slot); definition["slots"]=slots;
     named["face"]=2; skin["Head"]=named; skins["default"]=skin; skins["Blue"]=skin.duplicate(true); definition["skins"]=skins; definition["skin"]="default"; root["skeleton_2d"]=definition;
     entities.push_back(root); entities.push_back(bone); entities.push_back(image); test->set_entities(entities); edit_scene(test,nullptr); set_mode(0);
-    bool ok=true;
+    bool ok=event_ok;
     // Real field input: live preview must not create document edits per mouse sample.
     select_target(1);
     auto *number=static_cast<SkeletonScrubSpinBox *>(canvas_values[0]);
@@ -959,7 +1047,7 @@ void ECSAnimationEditor::action(int command) {
 	}
 	if(command==1) { if(clip.is_valid()) { feedback->set_text(String(U"已有动画，直接插入关键帧。")); return; } clip.instantiate(); clip->set_length(4); clip->set_loop_mode(Animation::LOOP_LINEAR); data["clip"]=clip; data["targets"]=PackedInt64Array(); commit_animation(data,String(U"创建 ECS 动画")); return; }
 	if(clip.is_null()) { feedback->set_text(String(U"请先创建动画。")); return; }
-	if(command==4 || command==5 || command==10) { seek(time->get_value()); playing=command==5; playback_time=time->get_value(); return; }
+	if(command==4 || command==5 || command==10) { seek(time->get_value()); playing=command==5; playback_include_start=playing; playback_time=time->get_value(); return; }
 	clip=clip->duplicate(true); if(command==2 || command==3) { data["clip"]=clip; }
 	String current=data.get("state",String()); Dictionary named=data.get("states",Dictionary()); if((command==2 || command==3) && editing_state.is_empty() && !current.is_empty()) { named[current]=clip; data["states"]=named; }
 	if(command==3) { Vector2i key=selected_key; if(key.x<0 || key.x>=clip->get_track_count() || key.y<0 || key.y>=clip->track_get_key_count(key.x)) { return; } clip->track_remove_key(key.x,key.y); selected_key=Vector2i(-1,-1); }

@@ -230,6 +230,11 @@ class ECSAnimationEditor : public VBoxContainer {
 	Vector<Button *> animation_buttons;
 	bool animation_mode=false, playing=false, refreshing=false;
 	double playback_time=0;
+	bool playback_include_start=false;
+	Label *event_toast=nullptr;
+	double event_toast_age=2;
+	void show_preview_events(const Array &p_events);
+	void update_event_toast(double p_delta);
 	Vector2i selected_key=Vector2i(-1,-1);
 	String editing_state;
 	Ref<Animation> current_clip() const;

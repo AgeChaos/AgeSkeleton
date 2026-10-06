@@ -296,7 +296,7 @@ void ECSAnimationEditor::frame_changed(double value) { seek(value/timeline_fps);
 void ECSAnimationEditor::transport(int command) {
 	Ref<Animation> clip=current_clip(); if(clip.is_null() || !animation_mode) { return; }
 	double start=loop_start->get_value()/timeline_fps,end=MIN(clip->get_length(),loop_end->get_value()/timeline_fps); if(end<=start) { start=0; end=clip->get_length(); }
-	if(command==0) { seek(start); } else if(command==1) { seek(MAX(start,time->get_value()-1.0/timeline_fps)); } else if(command==4) { seek(MIN(end,time->get_value()+1.0/timeline_fps)); } else if(command==5) { seek(end); } else if(command==6) { playing=false; } else { playback_direction=command==2?-1:1; if(time->get_value()<start || time->get_value()>end || (playback_direction>0 && time->get_value()>=end) || (playback_direction<0 && time->get_value()<=start)) { seek(playback_direction>0?start:end); } playing=true; playback_time=time->get_value(); }
+	if(command==0) { seek(start); } else if(command==1) { seek(MAX(start,time->get_value()-1.0/timeline_fps)); } else if(command==4) { seek(MIN(end,time->get_value()+1.0/timeline_fps)); } else if(command==5) { seek(end); } else if(command==6) { playing=false; } else { playback_direction=command==2?-1:1; if(time->get_value()<start || time->get_value()>end || (playback_direction>0 && time->get_value()>=end) || (playback_direction<0 && time->get_value()<=start)) { seek(playback_direction>0?start:end); } playback_include_start=!playing; playing=true; playback_time=time->get_value(); }
 }
 
 #endif

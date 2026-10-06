@@ -544,7 +544,7 @@ Dictionary ECSAnimationEditor::skeleton_ai_request(const Dictionary &request) {
         if(op=="preview") {
             if(current_clip().is_null()) { return finish(false,"No animation"); }
             loop_start->set_value(0); loop_end->set_value(current_clip()->get_length()*timeline_fps); loop_playback->set_pressed_no_signal(current_clip()->get_loop_mode()!=Animation::LOOP_NONE);
-            seek(at); playing=bool(request.get("playing",false)); playback_time=at; ++skeleton_ai_revision;
+            seek(at); playing=bool(request.get("playing",false)); playback_include_start=playing; playback_time=at; ++skeleton_ai_revision;
             Dictionary pose; for(const char *field:{"position","rotation","scale","shear"}) { pose[field]=ECSAIValue::encode(local_canvas->get_authoring_vector(entity,field)); } reply["pose"]=pose; Ref<ECSWorld> snapshot=scene->instantiate(); if(snapshot.is_valid()) { auto ids=snapshot->query(PackedStringArray(),true); snapshot->travel_animation(ids[rig],animation_name,0); Dictionary anim=snapshot->get_animation(ids[rig]); if(animation_name.is_empty()) { anim=Dictionary(Dictionary(entities[rig])["animation"]).duplicate(true); auto ts=PackedInt64Array(anim.get("targets",PackedInt64Array())); for(int i=0;i<ts.size();i++) { ts.set(i,ids[ts[i]]); } anim["targets"]=ts; } anim["time"]=at; anim["playing"]=true; if(snapshot->set_animation(ids[rig],anim)) { snapshot->advance_animation_preview(0); reply["slots"]=ECSAIValue::encode(snapshot->get_skeleton_2d(ids[rig]).get("slots",Array())); } } return finish(true);
         }
         String field=request.get("field","rotation"); int field_index=field=="position"?0:field=="rotation"?1:field=="scale"?2:field=="shear"?3:-1;
